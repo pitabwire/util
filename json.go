@@ -3,12 +3,12 @@ package util
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"log/slog"
 	"math/rand"
 	"net/http"
+	"reflect"
 	"runtime/debug"
-	"time"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // JSONResponse represents an HTTP response which contains a JSON body.
@@ -18,7 +18,7 @@ type JSONResponse struct {
 	// JSON represents the JSON that should be serialised and sent to the client
 	JSON interface{}
 	// Headers represent any headers that should be sent to the client
-	Headers map[string]string
+	Headers map[string]any
 }
 
 // Is2xx returns true if the Code is between 200 and 299.
@@ -28,7 +28,7 @@ func (r JSONResponse) Is2xx() bool {
 
 // RedirectResponse returns a JSONResponse which 302s the client to the given location.
 func RedirectResponse(location string) JSONResponse {
-	headers := make(map[string]string)
+	headers := make(map[string]any)
 	headers["Location"] = location
 	return JSONResponse{
 		Code:    302,
@@ -92,11 +92,9 @@ func Protect(handler http.HandlerFunc) http.HandlerFunc {
 		defer func() {
 			if r := recover(); r != nil {
 				logger := GetLogger(req.Context())
-				logger.WithFields(log.Fields{
-					"panic": r,
-				}).Errorf(
-					"Request panicked!\n%s", debug.Stack(),
-				)
+				logger.
+					With(slog.Any("panic", r), slog.Any("stack", debug.Stack())).
+					Error("Request panicked!")
 				respond(w, req, MessageResponse(500, "Internal Server Error"))
 			}
 		}()
@@ -109,18 +107,20 @@ func Protect(handler http.HandlerFunc) http.HandlerFunc {
 // This can be accessed via GetLogger(Context).
 func RequestWithLogging(req *http.Request) *http.Request {
 	reqID := RandomString(12)
+
+	logger := GetLogger(req.Context()).With(
+		slog.String("req.method", req.Method),
+		slog.String("req.path", req.URL.Path),
+		slog.String("req.id", reqID))
+
 	// Set a Logger and request ID on the context
-	ctx := ContextWithLogger(req.Context(), log.WithFields(log.Fields{
-		"req.method": req.Method,
-		"req.path":   req.URL.Path,
-		"req.id":     reqID,
-	}))
+	ctx := ContextWithLogger(req.Context(), logger)
+
 	ctx = context.WithValue(ctx, ctxValueRequestID, reqID)
 	req = req.WithContext(ctx)
 
 	if req.Method != http.MethodOptions {
-		logger := GetLogger(req.Context())
-		logger.Trace("Incoming request")
+		logger.Debug("Incoming request")
 	}
 
 	return req
@@ -154,15 +154,39 @@ func respond(w http.ResponseWriter, req *http.Request, res JSONResponse) {
 	// Set custom headers
 	if res.Headers != nil {
 		for h, val := range res.Headers {
-			w.Header().Set(h, val)
+
+			var headerValues []any
+
+			// Check if the value is already a headerValues
+			if reflect.TypeOf(val).Kind() == reflect.Slice {
+				v := reflect.ValueOf(val)
+				for i := 0; i < v.Len(); i++ {
+					headerValues = append(headerValues, v.Index(i).Interface())
+				}
+			} else {
+				// If not a headerValues, wrap it in a headerValues
+				headerValues = []any{val}
+			}
+
+			// Iterate over the headerValues and validate each element
+			for _, item := range headerValues {
+				switch v := item.(type) {
+				case string:
+					w.Header().Add(h, v)
+				case *http.Cookie:
+					http.SetCookie(w, v)
+				default:
+					w.Header().Add(h, fmt.Sprintf("%v", v))
+				}
+			}
 		}
 	}
 
 	// Marshal JSON response into raw bytes to send as the HTTP body
 	resBytes, err := json.Marshal(res.JSON)
 	if err != nil {
-		logger.WithError(err).Error("Failed to marshal JSONResponse")
-		// this should never fail to be marshalled so drop err to the floor
+		logger.With(slog.Any("error", err)).Error("Failed to marshal JSONResponse")
+		// this should never fail to be marshaled so drop err to the floor
 		res = MessageResponse(500, "Internal Server Error")
 		resBytes, _ = json.Marshal(res.JSON)
 	}
@@ -170,7 +194,7 @@ func respond(w http.ResponseWriter, req *http.Request, res JSONResponse) {
 	// Set status code and write the body
 	w.WriteHeader(res.Code)
 	if req.Method != http.MethodOptions {
-		logger.WithField("code", res.Code).Tracef("Responding (%d bytes)", len(resBytes))
+		logger.With(slog.Any("code", res.Code)).Debug("Responding (%d bytes)", len(resBytes))
 	}
 	_, _ = w.Write(resBytes)
 }
@@ -205,8 +229,4 @@ func RandomString(n int) string {
 		b[i] = alphanumerics[rand.Int63()%int64(len(alphanumerics))]
 	}
 	return string(b)
-}
-
-func init() {
-	rand.Seed(time.Now().UTC().UnixNano())
 }
