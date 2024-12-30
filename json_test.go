@@ -62,7 +62,7 @@ func TestMakeJSONAPI(t *testing.T) {
 
 func TestMakeJSONAPICustomHeaders(t *testing.T) {
 	mock := MockJSONRequestHandler{func(req *http.Request) JSONResponse {
-		headers := make(map[string]string)
+		headers := make(map[string]any)
 		headers["Custom"] = "Thing"
 		headers["X-Custom"] = "Things"
 		return JSONResponse{
@@ -221,7 +221,7 @@ func TestWithCORSOptions(t *testing.T) {
 	mockReq, _ := http.NewRequest("OPTIONS", "http://example.com/foo", nil)
 	h := WithCORSOptions(func(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(200)
-		w.Write([]byte("yep"))
+		_, _ = w.Write([]byte("yep"))
 	})
 	h(mockWriter, mockReq)
 	if mockWriter.Code != 200 {

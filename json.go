@@ -186,7 +186,7 @@ func respond(w http.ResponseWriter, req *http.Request, res JSONResponse) {
 	resBytes, err := json.Marshal(res.JSON)
 	if err != nil {
 		logger.With(slog.Any("error", err)).Error("Failed to marshal JSONResponse")
-		// this should never fail to be marshaled so drop err to the floor
+		// this should never fail to be marshalled so drop err to the floor
 		res = MessageResponse(500, "Internal Server Error")
 		resBytes, _ = json.Marshal(res.JSON)
 	}
@@ -194,7 +194,7 @@ func respond(w http.ResponseWriter, req *http.Request, res JSONResponse) {
 	// Set status code and write the body
 	w.WriteHeader(res.Code)
 	if req.Method != http.MethodOptions {
-		logger.With(slog.Any("code", res.Code)).Debug("Responding (%d bytes)", len(resBytes))
+		logger.With(slog.Any("code", res.Code), slog.Any("byte count", len(resBytes))).Debug("Responding")
 	}
 	_, _ = w.Write(resBytes)
 }
