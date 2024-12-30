@@ -20,7 +20,7 @@ jobs:
         go: ["1.23"]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go }}
@@ -35,7 +35,7 @@ jobs:
     name: Linting
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install Go
         uses: actions/setup-go@v3
         with:
