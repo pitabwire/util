@@ -156,13 +156,13 @@ func TestGetLogger(t *testing.T) {
 	mockReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
 	ctx := context.WithValue(mockReq.Context(), ctxValueLogger, entry)
 	mockReq = mockReq.WithContext(ctx)
-	ctxLogger := GetLogger(mockReq.Context())
+	ctxLogger := GetLoggerCtx(mockReq.Context())
 	if ctxLogger != entry {
 		t.Errorf("TestGetLogger wanted logger '%v', got '%v'", entry, ctxLogger)
 	}
 
 	noLoggerInReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
-	ctxLogger = GetLogger(noLoggerInReq.Context())
+	ctxLogger = GetLoggerCtx(noLoggerInReq.Context())
 	if ctxLogger == nil {
 		t.Errorf("TestGetLogger wanted logger, got nil")
 	}

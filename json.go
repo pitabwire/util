@@ -91,7 +91,7 @@ func Protect(handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		defer func() {
 			if r := recover(); r != nil {
-				logger := GetLogger(req.Context())
+				logger := GetLoggerCtx(req.Context())
 				logger.
 					With(slog.Any("panic", r), slog.Any("stack", debug.Stack())).
 					Error("Request panicked!")
@@ -108,7 +108,7 @@ func Protect(handler http.HandlerFunc) http.HandlerFunc {
 func RequestWithLogging(req *http.Request) *http.Request {
 	reqID := RandomString(12)
 
-	logger := GetLogger(req.Context()).With(
+	logger := GetLoggerCtx(req.Context()).With(
 		slog.String("req.method", req.Method),
 		slog.String("req.path", req.URL.Path),
 		slog.String("req.id", reqID))
@@ -149,7 +149,7 @@ func MakeJSONAPI(handler JSONRequestHandler) http.HandlerFunc {
 }
 
 func respond(w http.ResponseWriter, req *http.Request, res JSONResponse) {
-	logger := GetLogger(req.Context())
+	logger := GetLoggerCtx(req.Context())
 
 	// Set custom headers
 	if res.Headers != nil {
