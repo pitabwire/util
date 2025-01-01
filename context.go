@@ -2,7 +2,8 @@ package util
 
 import (
 	"context"
-	"log/slog"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // contextKeys is a type alias for string to namespace Context keys per-package.
@@ -24,23 +25,18 @@ func GetRequestID(ctx context.Context) string {
 // ctxValueLogger is the key to extract the logrus Logger.
 const ctxValueLogger = contextKeys("logger")
 
-// GetLoggerCtx retrieves the logger from the supplied context.
-// Always returns a logger, even if there wasn't one originally supplied.
-func GetLoggerCtx(ctx context.Context) *slog.Logger {
-	l := ctx.Value(ctxValueLogger)
-	if l == nil {
-		return GetLogger()
-	}
-	return l.(*slog.Logger)
-}
-
 // GetLogger retrieves the logrus logger from the supplied context. Always returns a logger,
 // even if there wasn't one originally supplied.
-func GetLogger() *slog.Logger {
-	return slog.Default()
+func GetLogger(ctx context.Context) *log.Entry {
+	l := ctx.Value(ctxValueLogger)
+	if l == nil {
+		// Always return a logger so callers don't need to constantly nil check.
+		return log.WithField("context", "missing")
+	}
+	return l.(*log.Entry)
 }
 
 // ContextWithLogger creates a new context, which will use the given logger.
-func ContextWithLogger(ctx context.Context, l *slog.Logger) context.Context {
+func ContextWithLogger(ctx context.Context, l *log.Entry) context.Context {
 	return context.WithValue(ctx, ctxValueLogger, l)
 }

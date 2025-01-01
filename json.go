@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"math/rand"
 	"net/http"
 	"reflect"
 	"runtime/debug"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // JSONResponse represents an HTTP response which contains a JSON body.
@@ -91,10 +92,12 @@ func Protect(handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		defer func() {
 			if r := recover(); r != nil {
-				logger := GetLoggerCtx(req.Context())
-				logger.
-					With(slog.Any("panic", r), slog.Any("stack", debug.Stack())).
-					Error("Request panicked!")
+				logger := GetLogger(req.Context())
+				logger.WithFields(log.Fields{
+					"panic": r,
+				}).Errorf(
+					"Request panicked!\n%s", debug.Stack(),
+				)
 				respond(w, req, MessageResponse(500, "Internal Server Error"))
 			}
 		}()
@@ -107,20 +110,18 @@ func Protect(handler http.HandlerFunc) http.HandlerFunc {
 // This can be accessed via GetLogger(Context).
 func RequestWithLogging(req *http.Request) *http.Request {
 	reqID := RandomString(12)
-
-	logger := GetLoggerCtx(req.Context()).With(
-		slog.String("req.method", req.Method),
-		slog.String("req.path", req.URL.Path),
-		slog.String("req.id", reqID))
-
 	// Set a Logger and request ID on the context
-	ctx := ContextWithLogger(req.Context(), logger)
-
+	ctx := ContextWithLogger(req.Context(), log.WithFields(log.Fields{
+		"req.method": req.Method,
+		"req.path":   req.URL.Path,
+		"req.id":     reqID,
+	}))
 	ctx = context.WithValue(ctx, ctxValueRequestID, reqID)
 	req = req.WithContext(ctx)
 
 	if req.Method != http.MethodOptions {
-		logger.Debug("Incoming request")
+		logger := GetLogger(req.Context())
+		logger.Trace("Incoming request")
 	}
 
 	return req
@@ -149,7 +150,7 @@ func MakeJSONAPI(handler JSONRequestHandler) http.HandlerFunc {
 }
 
 func respond(w http.ResponseWriter, req *http.Request, res JSONResponse) {
-	logger := GetLoggerCtx(req.Context())
+	logger := GetLogger(req.Context())
 
 	// Set custom headers
 	if res.Headers != nil {
@@ -185,7 +186,7 @@ func respond(w http.ResponseWriter, req *http.Request, res JSONResponse) {
 	// Marshal JSON response into raw bytes to send as the HTTP body
 	resBytes, err := json.Marshal(res.JSON)
 	if err != nil {
-		logger.With(slog.Any("error", err)).Error("Failed to marshal JSONResponse")
+		logger.WithError(err).Error("Failed to marshal JSONResponse")
 		// this should never fail to be marshalled so drop err to the floor
 		res = MessageResponse(500, "Internal Server Error")
 		resBytes, _ = json.Marshal(res.JSON)
@@ -194,7 +195,7 @@ func respond(w http.ResponseWriter, req *http.Request, res JSONResponse) {
 	// Set status code and write the body
 	w.WriteHeader(res.Code)
 	if req.Method != http.MethodOptions {
-		logger.With(slog.Any("code", res.Code), slog.Any("byte count", len(resBytes))).Debug("Responding")
+		logger.WithField("code", res.Code).Tracef("Responding (%d bytes)", len(resBytes))
 	}
 	_, _ = w.Write(resBytes)
 }

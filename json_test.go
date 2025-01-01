@@ -3,10 +3,11 @@ package util
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type MockJSONRequestHandler struct {
@@ -22,7 +23,7 @@ type MockResponse struct {
 }
 
 func TestMakeJSONAPI(t *testing.T) {
-	slog.SetLogLoggerLevel(slog.LevelError) // suppress logs in test output
+	log.SetLevel(log.PanicLevel) // suppress logs in test output
 	tests := []struct {
 		Return     JSONResponse
 		ExpectCode int
@@ -89,7 +90,7 @@ func TestMakeJSONAPICustomHeaders(t *testing.T) {
 }
 
 func TestMakeJSONAPIRedirect(t *testing.T) {
-	slog.SetLogLoggerLevel(slog.LevelError) // suppress logs in test output
+	log.SetLevel(log.PanicLevel) // suppress logs in test output
 	mock := MockJSONRequestHandler{func(req *http.Request) JSONResponse {
 		return RedirectResponse("https://matrix.org")
 	}}
@@ -107,7 +108,7 @@ func TestMakeJSONAPIRedirect(t *testing.T) {
 }
 
 func TestMakeJSONAPIError(t *testing.T) {
-	slog.SetLogLoggerLevel(slog.LevelError) // suppress logs in test output
+	log.SetLevel(log.PanicLevel) // suppress logs in test output
 	mock := MockJSONRequestHandler{func(req *http.Request) JSONResponse {
 		err := errors.New("oops")
 		return ErrorResponse(err)
@@ -151,29 +152,29 @@ func TestIs2xx(t *testing.T) {
 }
 
 func TestGetLogger(t *testing.T) {
-	slog.SetLogLoggerLevel(slog.LevelError) // suppress logs in test output
-	entry := slog.With(slog.String("test", "yep"))
+	log.SetLevel(log.PanicLevel) // suppress logs in test output
+	entry := log.WithField("test", "yep")
 	mockReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
 	ctx := context.WithValue(mockReq.Context(), ctxValueLogger, entry)
 	mockReq = mockReq.WithContext(ctx)
-	ctxLogger := GetLoggerCtx(mockReq.Context())
+	ctxLogger := GetLogger(mockReq.Context())
 	if ctxLogger != entry {
 		t.Errorf("TestGetLogger wanted logger '%v', got '%v'", entry, ctxLogger)
 	}
 
 	noLoggerInReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
-	ctxLogger = GetLoggerCtx(noLoggerInReq.Context())
+	ctxLogger = GetLogger(noLoggerInReq.Context())
 	if ctxLogger == nil {
 		t.Errorf("TestGetLogger wanted logger, got nil")
 	}
 }
 
 func TestProtect(t *testing.T) {
-	slog.SetLogLoggerLevel(slog.LevelError) // suppress logs in test output
+	log.SetLevel(log.PanicLevel) // suppress logs in test output
 	mockWriter := httptest.NewRecorder()
 	mockReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
 	mockReq = mockReq.WithContext(
-		context.WithValue(mockReq.Context(), ctxValueLogger, slog.Default().With("test", "yep")),
+		context.WithValue(mockReq.Context(), ctxValueLogger, log.WithField("test", "yep")),
 	)
 	h := Protect(func(w http.ResponseWriter, req *http.Request) {
 		panic("oh noes!")
@@ -194,7 +195,7 @@ func TestProtect(t *testing.T) {
 }
 
 func TestProtectWithoutLogger(t *testing.T) {
-	slog.SetLogLoggerLevel(slog.LevelError) // suppress logs in test output
+	log.SetLevel(log.PanicLevel) // suppress logs in test output
 	mockWriter := httptest.NewRecorder()
 	mockReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
 	h := Protect(func(w http.ResponseWriter, req *http.Request) {
@@ -216,7 +217,7 @@ func TestProtectWithoutLogger(t *testing.T) {
 }
 
 func TestWithCORSOptions(t *testing.T) {
-	slog.SetLogLoggerLevel(slog.LevelError) // suppress logs in test output
+	log.SetLevel(log.PanicLevel) // suppress logs in test output
 	mockWriter := httptest.NewRecorder()
 	mockReq, _ := http.NewRequest("OPTIONS", "http://example.com/foo", nil)
 	h := WithCORSOptions(func(w http.ResponseWriter, req *http.Request) {
@@ -242,7 +243,7 @@ func TestWithCORSOptions(t *testing.T) {
 }
 
 func TestGetRequestID(t *testing.T) {
-	slog.SetLogLoggerLevel(slog.LevelError) // suppress logs in test output
+	log.SetLevel(log.PanicLevel) // suppress logs in test output
 	reqID := "alphabetsoup"
 	mockReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
 	ctx := context.WithValue(mockReq.Context(), ctxValueRequestID, reqID)
