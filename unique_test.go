@@ -23,7 +23,7 @@ func TestUnique(t *testing.T) {
 
 	for _, test := range testCases {
 		input := []byte(test.Input)
-		want := string(test.Want)
+		want := test.Want
 		got := string(input[:Unique(sortBytes(input))])
 		if got != want {
 			t.Fatal("Wanted ", want, " got ", got)

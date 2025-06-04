@@ -1,17 +1,29 @@
-run:
-  # Use recommended exclude options
-  issues:
-    exclude-files:
-      - "*.generated.go"
-
+version: "2"
 linters:
   enable:
+    - gocyclo
+    - misspell
+    - unconvert
+    - unparam
     - staticcheck
-    - gosimple
     - unused
-
-linters-settings:
-  govet:
-    # Replace check-shadowing with shadow
-    enabled-checks:
-      - shadow
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
