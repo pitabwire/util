@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"net/http"
 	"reflect"
 	"runtime/debug"
@@ -219,15 +218,4 @@ func SetCORSHeaders(w http.ResponseWriter) {
 	}
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization")
-}
-
-const alphanumerics = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-
-// RandomString generates a pseudo-random string of length n.
-func RandomString(n int) string {
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = alphanumerics[rand.Int63()%int64(len(alphanumerics))]
-	}
-	return string(b)
 }
