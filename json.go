@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"reflect"
 	"runtime/debug"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // JSONResponse represents an HTTP response which contains a JSON body.
@@ -91,10 +89,8 @@ func Protect(handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		defer func() {
 			if r := recover(); r != nil {
-				logger := GetLogger(req.Context())
-				logger.WithFields(log.Fields{
-					"panic": r,
-				}).Errorf(
+				logger := Log(req.Context())
+				logger.WithField("panic", r).Error(
 					"Request panicked!\n%s", debug.Stack(),
 				)
 				respond(w, req, MessageResponse(500, "Internal Server Error"))
@@ -108,18 +104,18 @@ func Protect(handler http.HandlerFunc) http.HandlerFunc {
 // http.Requests will have a logger (with a request ID/method/path logged) attached to the Context.
 // This can be accessed via GetLogger(Context).
 func RequestWithLogging(req *http.Request) *http.Request {
+
 	reqID := RandomString(12)
 	// Set a Logger and request ID on the context
-	ctx := ContextWithLogger(req.Context(), log.WithFields(log.Fields{
-		"req.method": req.Method,
-		"req.path":   req.URL.Path,
-		"req.id":     reqID,
-	}))
+	ctx := ContextWithLogger(req.Context(), Log(req.Context()).
+		WithField("req.method", req.Method).
+		WithField("req.path", req.URL.Path).
+		WithField("req.id", reqID))
 	ctx = context.WithValue(ctx, ctxValueRequestID, reqID)
 	req = req.WithContext(ctx)
 
 	if req.Method != http.MethodOptions {
-		logger := GetLogger(req.Context())
+		logger := Log(req.Context())
 		logger.Trace("Incoming request")
 	}
 
@@ -149,7 +145,7 @@ func MakeJSONAPI(handler JSONRequestHandler) http.HandlerFunc {
 }
 
 func respond(w http.ResponseWriter, req *http.Request, res JSONResponse) {
-	logger := GetLogger(req.Context())
+	logger := Log(req.Context())
 
 	// Set custom headers
 	if res.Headers != nil {
@@ -194,7 +190,7 @@ func respond(w http.ResponseWriter, req *http.Request, res JSONResponse) {
 	// Set status code and write the body
 	w.WriteHeader(res.Code)
 	if req.Method != http.MethodOptions {
-		logger.WithField("code", res.Code).Tracef("Responding (%d bytes)", len(resBytes))
+		logger.WithField("code", res.Code).WithField("bytes", len(resBytes)).Trace("Responding")
 	}
 	_, _ = w.Write(resBytes)
 }

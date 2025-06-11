@@ -153,17 +153,17 @@ func TestIs2xx(t *testing.T) {
 
 func TestGetLogger(t *testing.T) {
 	log.SetLevel(log.PanicLevel) // suppress logs in test output
-	entry := log.WithField("test", "yep")
+	entry := newLogEntry(newLogger(defaultLogOptions())).WithField("test", "yep")
 	mockReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
 	ctx := context.WithValue(mockReq.Context(), ctxValueLogger, entry)
 	mockReq = mockReq.WithContext(ctx)
-	ctxLogger := GetLogger(mockReq.Context())
+	ctxLogger := Log(mockReq.Context())
 	if ctxLogger != entry {
 		t.Errorf("TestGetLogger wanted logger '%v', got '%v'", entry, ctxLogger)
 	}
 
 	noLoggerInReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
-	ctxLogger = GetLogger(noLoggerInReq.Context())
+	ctxLogger = Log(noLoggerInReq.Context())
 	if ctxLogger == nil {
 		t.Errorf("TestGetLogger wanted logger, got nil")
 	}
