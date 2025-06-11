@@ -28,9 +28,7 @@ func Log(ctx context.Context) *LogEntry {
 		return logEntry
 	}
 
-	log := newLogger(defaultLogOptions())
-	log.ctx = ctx
-	return newLogEntry(log)
+	return NewLogger(ctx, DefaultLogOptions())
 }
 
 // SLog obtains an slog interface from the log entry in the context
@@ -47,7 +45,7 @@ type iLogger struct {
 	stackTraces bool
 }
 
-type logOptions struct {
+type LogOptions struct {
 	*slog.HandlerOptions
 	PrintFormat    string
 	TimeFormat     string
@@ -55,14 +53,16 @@ type logOptions struct {
 	ShowStackTrace bool
 }
 
-func defaultLogOptions() *logOptions {
-	return &logOptions{
+func DefaultLogOptions() *LogOptions {
+	return &LogOptions{
 		HandlerOptions: &slog.HandlerOptions{
 			AddSource: false,
 			Level:     slog.LevelInfo,
 		},
-		TimeFormat: time.DateTime,
-		NoColor:    false,
+		PrintFormat:    "",
+		TimeFormat:     time.DateTime,
+		NoColor:        false,
+		ShowStackTrace: false,
 	}
 }
 
@@ -85,7 +85,7 @@ func ParseLevel(levelStr string) (slog.Level, error) {
 	}
 }
 
-func newLogger(opts *logOptions) *iLogger {
+func NewLogger(ctx context.Context, opts *LogOptions) *LogEntry {
 
 	logLevel := opts.Level.Level()
 	outputWriter := os.Stdout
@@ -106,7 +106,8 @@ func newLogger(opts *logOptions) *iLogger {
 
 	slog.SetDefault(log)
 
-	return &iLogger{log: log, stackTraces: opts.ShowStackTrace}
+	il := &iLogger{ctx: ctx, log: log, stackTraces: opts.ShowStackTrace}
+	return newLogEntry(il)
 }
 
 func (l *iLogger) clone(ctx context.Context) *iLogger {

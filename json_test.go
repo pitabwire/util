@@ -153,7 +153,7 @@ func TestIs2xx(t *testing.T) {
 
 func TestGetLogger(t *testing.T) {
 	log.SetLevel(log.PanicLevel) // suppress logs in test output
-	entry := newLogEntry(newLogger(defaultLogOptions())).WithField("test", "yep")
+	entry := NewLogger(context.TODO(), DefaultLogOptions()).WithField("test", "yep")
 	mockReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
 	ctx := context.WithValue(mockReq.Context(), ctxValueLogger, entry)
 	mockReq = mockReq.WithContext(ctx)
