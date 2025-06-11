@@ -33,7 +33,7 @@ func Log(ctx context.Context) *LogEntry {
 
 // SLog obtains an slog interface from the log entry in the context
 func SLog(ctx context.Context) *slog.Logger {
-	return Log(ctx).l.log
+	return Log(ctx).SLog()
 }
 
 type iLogger struct {
@@ -213,6 +213,10 @@ type exitFunc func(int)
 
 func (e *LogEntry) LevelEnabled(ctx context.Context, level slog.Level) bool {
 	return e.l.Enabled(ctx, level)
+}
+
+func (e *LogEntry) SLog() *slog.Logger {
+	return e.l.log
 }
 
 func (e *LogEntry) WithContext(ctx context.Context) *LogEntry {
