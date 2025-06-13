@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/lmittmann/tint"
@@ -41,13 +42,18 @@ func SLog(ctx context.Context) *slog.Logger {
 	return Log(ctx).SLog()
 }
 
-type iLogger struct {
-	ctx context.Context
-	// Function to exit the application, defaults to `os.Exit()`
-	ExitFunc exitFunc
-
+// LogEntry handles logging functionality with immutable chained calls
+type LogEntry struct {
+	ctx         context.Context
 	log         *slog.Logger
 	stackTraces bool
+}
+
+// logEntryPool maintains a pool of LogEntry objects to reduce GC pressure
+var logEntryPool = sync.Pool{
+	New: func() interface{} {
+		return &LogEntry{}
+	},
 }
 
 type LogOptions struct {
@@ -90,6 +96,7 @@ func ParseLevel(levelStr string) (slog.Level, error) {
 	}
 }
 
+// NewLogger creates a new instance of LogEntry with the provided context and options
 func NewLogger(ctx context.Context, opts *LogOptions) *LogEntry {
 	logLevel := opts.Level.Level()
 	outputWriter := os.Stdout
@@ -105,189 +112,175 @@ func NewLogger(ctx context.Context, opts *LogOptions) *LogEntry {
 	}
 
 	tintHandler := tint.NewHandler(outputWriter, handlerOptions)
-
 	log := slog.New(tintHandler)
-
 	slog.SetDefault(log)
 
-	il := &iLogger{ctx: ctx, log: log, stackTraces: opts.ShowStackTrace}
-	return newLogEntry(il)
+	// Get a LogEntry from the pool
+	entry := logEntryPool.Get().(*LogEntry)
+	entry.ctx = ctx
+	entry.log = log
+	entry.stackTraces = opts.ShowStackTrace
+	
+	return entry
 }
 
-func (l *iLogger) clone(ctx context.Context) *iLogger {
-	sl := *l.log
-	return &iLogger{ctx: ctx, log: &sl, stackTraces: l.stackTraces}
+// Release returns the LogEntry to the pool for reuse
+// Call this when you're done with a LogEntry and won't use it again
+func (e *LogEntry) Release() {
+	if e == nil {
+		return
+	}
+
+	// Reset fields before returning to pool
+	e.ctx = nil
+	e.log = nil
+	e.stackTraces = false
+
+	logEntryPool.Put(e)
 }
 
-func (l *iLogger) WithError(err error) {
-	l.log = l.log.With(tint.Err(err))
+// clone creates a new LogEntry with the same properties as the original
+func (e *LogEntry) clone() *LogEntry {
+	if e == nil {
+		return NewLogger(context.Background(), DefaultLogOptions())
+	}
+
+	// Get a new entry from the pool
+	clone := logEntryPool.Get().(*LogEntry)
+	clone.ctx = e.ctx
+	clone.log = e.log
+	clone.stackTraces = e.stackTraces
+
+	return clone
 }
 
-func (l *iLogger) WithAttr(attr ...any) {
-	l.log = l.log.With(attr...)
+// WithContext returns a new LogEntry with the given context
+func (e *LogEntry) WithContext(ctx context.Context) *LogEntry {
+	clone := e.clone()
+	clone.ctx = ctx
+	return clone
 }
 
-func (l *iLogger) WithField(key string, value any) {
-	l.log = l.log.With(key, value)
+// WithError returns a new LogEntry with the error added
+func (e *LogEntry) WithError(err error) *LogEntry {
+	return e.With(tint.Err(err))
 }
 
-func (l *iLogger) With(args ...any) {
-	l.log = l.log.With(args...)
+// WithField returns a new LogEntry with the field added
+func (e *LogEntry) WithField(key string, value any) *LogEntry {
+	return e.With(key, value)
 }
 
-func (l *iLogger) _ctx() context.Context {
-	if l.ctx == nil {
+// With returns a new LogEntry with the provided attributes added
+func (e *LogEntry) With(args ...any) *LogEntry {
+	// No args, return the same logger
+	if len(args) == 0 {
+		return e
+	}
+
+	clone := e.clone()
+	clone.log = clone.log.With(args...)
+	return clone
+}
+
+// _ctx returns the context or background if nil
+func (e *LogEntry) _ctx() context.Context {
+	if e.ctx == nil {
 		return context.Background()
 	}
-	return l.ctx
+	return e.ctx
 }
 
-func (l *iLogger) Log(ctx context.Context, level slog.Level, msg string, fields ...any) {
-	l.log.Log(ctx, level, msg, fields...)
+// Log logs a message at the given level
+func (e *LogEntry) Log(ctx context.Context, level slog.Level, msg string, fields ...any) {
+	e.log.Log(ctx, level, msg, fields...)
 }
 
-func (l *iLogger) Logf(ctx context.Context, level slog.Level, format string, args ...interface{}) {
-	if l.Enabled(ctx, level) {
-		l.log.Log(ctx, level, fmt.Sprintf(format, args...))
+// Logf logs a formatted message at the given level
+func (e *LogEntry) Logf(ctx context.Context, level slog.Level, format string, args ...interface{}) {
+	if e.Enabled(ctx, level) {
+		e.log.Log(ctx, level, fmt.Sprintf(format, args...))
 	}
 }
 
-func (l *iLogger) Trace(msg string, args ...any) {
-	l.Debug(msg, args...)
+// Trace logs a message at debug level (alias for backward compatibility)
+func (e *LogEntry) Trace(msg string, args ...any) {
+	e.Debug(msg, args...)
 }
 
-func (l *iLogger) Debug(msg string, args ...any) {
-	log := l.withFileLineNum()
-	log.DebugContext(l._ctx(), msg, args...)
+// Debug logs a message at debug level
+func (e *LogEntry) Debug(msg string, args ...any) {
+	log := e.withFileLineNum()
+	log.DebugContext(e._ctx(), msg, args...)
 }
 
-func (l *iLogger) Info(msg string, args ...any) {
-	l.log.InfoContext(l._ctx(), msg, args...)
+// Info logs a message at info level
+func (e *LogEntry) Info(msg string, args ...any) {
+	e.log.InfoContext(e._ctx(), msg, args...)
 }
 
-func (l *iLogger) Warn(msg string, args ...any) {
-	l.log.WarnContext(l._ctx(), msg, args...)
+// Printf logs a formatted message at info level
+func (e *LogEntry) Printf(format string, args ...any) {
+	e.Logf(e._ctx(), slog.LevelInfo, format, args...)
 }
 
-func (l *iLogger) Error(msg string, args ...any) {
-	log := l.withFileLineNum()
+// Warn logs a message at warn level
+func (e *LogEntry) Warn(msg string, args ...any) {
+	e.log.WarnContext(e._ctx(), msg, args...)
+}
 
-	if l.stackTraces {
-		log.ErrorContext(l._ctx(), fmt.Sprintf(" %s\n%s\n", msg, debug.Stack()), args...)
+// Error logs a message at error level
+func (e *LogEntry) Error(msg string, args ...any) {
+	log := e.withFileLineNum()
+
+	if e.stackTraces {
+		log.ErrorContext(e._ctx(), fmt.Sprintf(" %s\n%s\n", msg, debug.Stack()), args...)
 	}
 
-	log.ErrorContext(l._ctx(), msg, args...)
+	log.ErrorContext(e._ctx(), msg, args...)
 }
 
-func (l *iLogger) Fatal(msg string, args ...any) {
-	log := l.withFileLineNum()
+// Fatal logs a message at error level and exits with code 1
+func (e *LogEntry) Fatal(msg string, args ...any) {
+	log := e.withFileLineNum()
 
-	if l.stackTraces {
-		log.ErrorContext(l._ctx(), fmt.Sprintf(" %s\n%s\n", msg, debug.Stack()), args...)
+	if e.stackTraces {
+		log.ErrorContext(e._ctx(), fmt.Sprintf(" %s\n%s\n", msg, debug.Stack()), args...)
 	}
-	l.log.ErrorContext(l._ctx(), msg, args...)
-	l.Exit(1)
+	e.log.ErrorContext(e._ctx(), msg, args...)
+	e.Exit(1)
 }
 
-func (l *iLogger) Panic(msg string, _ ...any) {
+// Panic logs a message and panics
+func (e *LogEntry) Panic(msg string, _ ...any) {
 	panic(fmt.Sprintf(" %s\n%s\n", msg, debug.Stack()))
 }
 
-func (l *iLogger) Exit(code int) {
-	if l.ExitFunc == nil {
-		l.ExitFunc = os.Exit
-	}
-	l.ExitFunc(code)
+// Exit terminates the application with the given code
+func (e *LogEntry) Exit(code int) {
+	os.Exit(code)
 }
 
-func (l *iLogger) Enabled(ctx context.Context, level slog.Level) bool {
-	return l.log.Enabled(ctx, level)
+// Enabled returns whether the logger will log at the given level
+func (e *LogEntry) Enabled(ctx context.Context, level slog.Level) bool {
+	return e.log.Enabled(ctx, level)
 }
 
-func (l *iLogger) withFileLineNum() *slog.Logger {
+// LevelEnabled is an alias for Enabled for backward compatibility
+func (e *LogEntry) LevelEnabled(ctx context.Context, level slog.Level) bool {
+	return e.Enabled(ctx, level)
+}
+
+// SLog returns the underlying slog.Logger
+func (e *LogEntry) SLog() *slog.Logger {
+	return e.log
+}
+
+// withFileLineNum adds file and line information to the log entry
+func (e *LogEntry) withFileLineNum() *slog.Logger {
 	_, file, line, ok := runtime.Caller(CallerDepth)
 	if ok {
-		return l.log.With(tint.Attr(FileLineAttr, slog.Any("file", fmt.Sprintf("%s:%d", file, line))))
+		return e.log.With(tint.Attr(FileLineAttr, slog.Any("file", fmt.Sprintf("%s:%d", file, line))))
 	}
-	return l.log
-}
-
-// LogEntry Need a type to handle the chained calls.
-type LogEntry struct {
-	l *iLogger
-}
-
-func newLogEntry(l *iLogger) *LogEntry {
-	return &LogEntry{l: l}
-}
-
-type exitFunc func(int)
-
-func (e *LogEntry) LevelEnabled(ctx context.Context, level slog.Level) bool {
-	return e.l.Enabled(ctx, level)
-}
-
-func (e *LogEntry) SLog() *slog.Logger {
-	return e.l.log
-}
-
-func (e *LogEntry) WithContext(ctx context.Context) *LogEntry {
-	return newLogEntry(e.l.clone(ctx))
-}
-
-func (e *LogEntry) Log(ctx context.Context, level slog.Level, msg string, fields ...any) {
-	e.l.Log(ctx, level, msg, fields...)
-}
-func (e *LogEntry) Logf(ctx context.Context, level slog.Level, format string, args ...interface{}) {
-	e.l.Logf(ctx, level, format, args...)
-}
-
-func (e *LogEntry) Trace(msg string, args ...any) {
-	e.l.Debug(msg, args...)
-}
-
-func (e *LogEntry) Debug(msg string, args ...any) {
-	e.l.Debug(msg, args...)
-}
-
-func (e *LogEntry) Info(msg string, args ...any) {
-	e.l.Info(msg, args...)
-}
-
-func (e *LogEntry) Printf(format string, args ...any) {
-	e.l.Logf(e.l._ctx(), slog.LevelInfo, format, args...)
-}
-
-func (e *LogEntry) Warn(msg string, args ...any) {
-	e.l.Warn(msg, args...)
-}
-
-func (e *LogEntry) Error(msg string, args ...any) {
-	e.l.Error(msg, args...)
-}
-
-func (e *LogEntry) Fatal(msg string, args ...any) {
-	e.l.Fatal(msg, args...)
-}
-
-func (e *LogEntry) Panic(msg string, _ ...any) {
-	e.l.Panic(msg)
-}
-
-func (e *LogEntry) WithAttr(attr ...any) *LogEntry {
-	e.l.WithAttr(attr...)
-	return e
-}
-
-func (e *LogEntry) WithError(err error) *LogEntry {
-	e.l.WithError(err)
-	return e
-}
-func (e *LogEntry) WithField(key string, value any) *LogEntry {
-	e.l.WithField(key, value)
-	return e
-}
-func (e *LogEntry) With(args ...any) *LogEntry {
-	e.l.With(args...)
-	return e
+	return e.log
 }
