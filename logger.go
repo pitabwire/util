@@ -146,6 +146,12 @@ func (l *iLogger) Log(ctx context.Context, level slog.Level, msg string, fields 
 	l.log.Log(ctx, level, msg, fields...)
 }
 
+func (l *iLogger) Logf(ctx context.Context, level slog.Level, format string, args ...interface{}) {
+	if l.Enabled(ctx, level) {
+		l.log.Log(ctx, level, fmt.Sprintf(format, args...))
+	}
+}
+
 func (l *iLogger) Trace(msg string, args ...any) {
 	l.Debug(msg, args...)
 }
@@ -226,6 +232,10 @@ func (e *LogEntry) WithContext(ctx context.Context) *LogEntry {
 func (e *LogEntry) Log(ctx context.Context, level slog.Level, msg string, fields ...any) {
 	e.l.Log(ctx, level, msg, fields...)
 }
+func (e *LogEntry) Logf(ctx context.Context, level slog.Level, format string, args ...interface{}) {
+	e.l.Logf(ctx, level, fmt.Sprintf(format, args...))
+
+}
 
 func (e *LogEntry) Trace(msg string, args ...any) {
 	e.l.Debug(msg, args...)
@@ -240,7 +250,7 @@ func (e *LogEntry) Info(msg string, args ...any) {
 }
 
 func (e *LogEntry) Printf(format string, args ...any) {
-	e.Info(format, args...)
+	e.l.Logf(e.l._ctx(), slog.LevelInfo, format, args...)
 }
 
 func (e *LogEntry) Warn(msg string, args ...any) {
