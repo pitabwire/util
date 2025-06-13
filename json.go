@@ -21,7 +21,7 @@ type JSONResponse struct {
 
 // Is2xx returns true if the Code is between 200 and 299.
 func (r JSONResponse) Is2xx() bool {
-	return r.Code/100 == 2
+	return r.Code/100 == Status2xx
 }
 
 // RedirectResponse returns a JSONResponse which 302s the client to the given location.
@@ -29,7 +29,7 @@ func RedirectResponse(location string) JSONResponse {
 	headers := make(map[string]any)
 	headers["Location"] = location
 	return JSONResponse{
-		Code:    302,
+		Code:    StatusFound, // 302
 		JSON:    struct{}{},
 		Headers: headers,
 	}
@@ -47,10 +47,10 @@ func MessageResponse(code int, msg string) JSONResponse {
 
 // ErrorResponse returns an HTTP 500 JSONResponse with the stringified form of the given error.
 func ErrorResponse(err error) JSONResponse {
-	return MessageResponse(500, err.Error())
+	return MessageResponse(StatusInternalServerError, err.Error())
 }
 
-// MatrixErrorResponse is a function that returns error responses in the standard Matrix Error format (errcode / error)
+// MatrixErrorResponse is a function that returns error responses in the standard Matrix Error format (errcode / error).
 func MatrixErrorResponse(httpStatusCode int, errCode, message string) JSONResponse {
 	return JSONResponse{
 		Code: httpStatusCode,
@@ -67,17 +67,17 @@ type JSONRequestHandler interface {
 	OnIncomingRequest(req *http.Request) JSONResponse
 }
 
-// jsonRequestHandlerWrapper is a wrapper to allow in-line functions to conform to util.JSONRequestHandler
+// jsonRequestHandlerWrapper is a wrapper to allow in-line functions to conform to util.JSONRequestHandler.
 type jsonRequestHandlerWrapper struct {
 	function func(req *http.Request) JSONResponse
 }
 
-// OnIncomingRequest implements util.JSONRequestHandler
+// OnIncomingRequest implements util.JSONRequestHandler.
 func (r *jsonRequestHandlerWrapper) OnIncomingRequest(req *http.Request) JSONResponse {
 	return r.function(req)
 }
 
-// NewJSONRequestHandler converts the given OnIncomingRequest function into a JSONRequestHandler
+// NewJSONRequestHandler converts the given OnIncomingRequest function into a JSONRequestHandler.
 func NewJSONRequestHandler(f func(req *http.Request) JSONResponse) JSONRequestHandler {
 	return &jsonRequestHandlerWrapper{f}
 }
@@ -93,7 +93,7 @@ func Protect(handler http.HandlerFunc) http.HandlerFunc {
 				logger.WithField("panic", r).Error(
 					"Request panicked!\n%s", debug.Stack(),
 				)
-				respond(w, req, MessageResponse(500, "Internal Server Error"))
+				respond(w, req, MessageResponse(StatusInternalServerError, "Internal Server Error"))
 			}
 		}()
 		handler(w, req)
@@ -104,8 +104,7 @@ func Protect(handler http.HandlerFunc) http.HandlerFunc {
 // http.Requests will have a logger (with a request ID/method/path logged) attached to the Context.
 // This can be accessed via GetLogger(Context).
 func RequestWithLogging(req *http.Request) *http.Request {
-
-	reqID := RandomString(12)
+	reqID := RandomString(DefaultRequestIDLength)
 	// Set a Logger and request ID on the context
 	ctx := ContextWithLogger(req.Context(), Log(req.Context()).
 		WithField("req.method", req.Method).
@@ -131,7 +130,7 @@ func MakeJSONAPI(handler JSONRequestHandler) http.HandlerFunc {
 
 		if req.Method == http.MethodOptions {
 			SetCORSHeaders(w)
-			w.WriteHeader(200)
+			w.WriteHeader(http.StatusOK)
 			return
 		}
 		res := handler.OnIncomingRequest(req)
@@ -150,13 +149,13 @@ func respond(w http.ResponseWriter, req *http.Request, res JSONResponse) {
 	// Set custom headers
 	if res.Headers != nil {
 		for h, val := range res.Headers {
-
 			var headerValues []any
 
 			// Check if the value is already a headerValues
 			if reflect.TypeOf(val).Kind() == reflect.Slice {
 				v := reflect.ValueOf(val)
 				for i := 0; i < v.Len(); i++ {
+					// TODO: Go 1.22+ integer range: for i := range v.Len() { ... }
 					headerValues = append(headerValues, v.Index(i).Interface())
 				}
 			} else {
@@ -183,7 +182,7 @@ func respond(w http.ResponseWriter, req *http.Request, res JSONResponse) {
 	if err != nil {
 		logger.WithError(err).Error("Failed to marshal JSONResponse")
 		// this should never fail to be marshalled so drop err to the floor
-		res = MessageResponse(500, "Internal Server Error")
+		res = MessageResponse(StatusInternalServerError, "Internal Server Error")
 		resBytes, _ = json.Marshal(res.JSON)
 	}
 
@@ -207,7 +206,7 @@ func WithCORSOptions(handler http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// SetCORSHeaders sets unrestricted origin Access-Control headers on the response writer
+// SetCORSHeaders sets unrestricted origin Access-Control headers on the response writer.
 func SetCORSHeaders(w http.ResponseWriter) {
 	if w.Header().Get("Access-Control-Allow-Origin") == "" {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -215,3 +214,10 @@ func SetCORSHeaders(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization")
 }
+
+const (
+	StatusFound               = 302
+	StatusInternalServerError = 500
+	DefaultRequestIDLength    = 12
+	Status2xx                 = 2
+)

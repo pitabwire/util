@@ -1,20 +1,24 @@
 package util
 
 import (
+	"crypto/rand"
+	"math/big"
 	"time"
-
-	"math/rand"
 
 	"github.com/rs/xid"
 )
 
 const alphanumerics = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-// RandomString generates a pseudo-random string of length n.
+// RandomString generates a cryptographically secure random string of length n.
 func RandomString(n int) string {
 	b := make([]byte, n)
 	for i := range b {
-		b[i] = alphanumerics[rand.Int63()%int64(len(alphanumerics))]
+		idx, err := rand.Int(rand.Reader, big.NewInt(int64(len(alphanumerics))))
+		if err != nil {
+			panic(err)
+		}
+		b[i] = alphanumerics[idx.Int64()]
 	}
 	return string(b)
 }

@@ -1,7 +1,7 @@
 package util
 
 import (
-	"fmt"
+	"errors"
 	"sort"
 )
 
@@ -12,7 +12,7 @@ import (
 // O(n).
 func Unique(data sort.Interface) int {
 	if !sort.IsSorted(data) {
-		panic(fmt.Errorf("util: the input to Unique() must be sorted"))
+		panic(errors.New("util: the input to Unique() must be sorted"))
 	}
 
 	if data.Len() == 0 {
@@ -40,18 +40,13 @@ func Unique(data sort.Interface) int {
 	return j + 1
 }
 
-// SortAndUnique sorts a list and removes duplicate entries in place.
-// Takes the same interface as sort.Sort
-// Returns the length of the data without duplicates
-// Uses the last occurrence of a duplicate.
-// O(nlog(n))
+// SortAndUnique sorts the data and removes duplicates. O(nlog(n)).
 func SortAndUnique(data sort.Interface) int {
 	sort.Sort(data)
 	return Unique(data)
 }
 
-// UniqueStrings turns a list of strings into a sorted list of unique strings.
-// O(nlog(n))
+// UniqueStrings returns a sorted slice of unique strings. O(nlog(n)).
 func UniqueStrings(strings []string) []string {
 	return strings[:SortAndUnique(sort.StringSlice(strings))]
 }

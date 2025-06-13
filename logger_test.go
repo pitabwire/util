@@ -1,7 +1,6 @@
 package util_test
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -9,18 +8,17 @@ import (
 )
 
 func TestLogs(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	logger := util.Log(ctx)
 	logger.Debug("testing debug logs")
 	logger.Info("testing logs")
 
 	err := errors.New("")
 	logger.WithError(err).Error("testing errors")
-
 }
 
 func TestStackTraceLogs(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	defaultLogs := util.DefaultLogOptions()
 	defaultLogs.ShowStackTrace = true
 	logger := util.NewLogger(ctx, defaultLogs)

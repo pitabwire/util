@@ -1,18 +1,19 @@
-package util
+package util_test
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/pitabwire/util"
 )
 
 type MockJSONRequestHandler struct {
-	handler func(req *http.Request) JSONResponse
+	handler func(req *http.Request) util.JSONResponse
 }
 
-func (h *MockJSONRequestHandler) OnIncomingRequest(req *http.Request) JSONResponse {
+func (h *MockJSONRequestHandler) OnIncomingRequest(req *http.Request) util.JSONResponse {
 	return h.handler(req)
 }
 
@@ -22,31 +23,31 @@ type MockResponse struct {
 
 func TestMakeJSONAPI(t *testing.T) {
 	tests := []struct {
-		Return     JSONResponse
+		Return     util.JSONResponse
 		ExpectCode int
 		ExpectJSON string
 	}{
 		// MessageResponse return values
-		{MessageResponse(500, "Everything is broken"), 500, `{"message":"Everything is broken"}`},
+		{util.MessageResponse(http.StatusInternalServerError, "Everything is broken"), http.StatusInternalServerError, `{"message":"Everything is broken"}`},
 		// interface return values
-		{JSONResponse{500, MockResponse{"yep"}, nil}, 500, `{"foo":"yep"}`},
+		{util.JSONResponse{http.StatusInternalServerError, MockResponse{"yep"}, nil}, http.StatusInternalServerError, `{"foo":"yep"}`},
 		// Error JSON return values which fail to be marshalled should fallback to text
-		{JSONResponse{500, struct {
+		{util.JSONResponse{http.StatusInternalServerError, struct {
 			Foo interface{} `json:"foo"`
-		}{func(cannotBe, marshalled string) {}}, nil}, 500, `{"message":"Internal Server Error"}`},
+		}{func(_, _ string) {}}, nil}, http.StatusInternalServerError, `{"message":"Internal Server Error"}`},
 		// With different status codes
-		{JSONResponse{201, MockResponse{"narp"}, nil}, 201, `{"foo":"narp"}`},
+		{util.JSONResponse{http.StatusCreated, MockResponse{"narp"}, nil}, http.StatusCreated, `{"foo":"narp"}`},
 		// Top-level array success values
-		{JSONResponse{200, []MockResponse{{"yep"}, {"narp"}}, nil}, 200, `[{"foo":"yep"},{"foo":"narp"}]`},
+		{util.JSONResponse{http.StatusOK, []MockResponse{{"yep"}, {"narp"}}, nil}, http.StatusOK, `[{"foo":"yep"},{"foo":"narp"}]`},
 	}
 
 	for _, tst := range tests {
-		mock := MockJSONRequestHandler{func(req *http.Request) JSONResponse {
+		mock := MockJSONRequestHandler{func(_ *http.Request) util.JSONResponse {
 			return tst.Return
 		}}
-		mockReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
+		mockReq, _ := http.NewRequest(http.MethodGet, "http://example.com/foo", nil)
 		mockWriter := httptest.NewRecorder()
-		handlerFunc := MakeJSONAPI(&mock)
+		handlerFunc := util.MakeJSONAPI(&mock)
 		handlerFunc(mockWriter, mockReq)
 		if mockWriter.Code != tst.ExpectCode {
 			t.Errorf("TestMakeJSONAPI wanted HTTP status %d, got %d", tst.ExpectCode, mockWriter.Code)
@@ -59,19 +60,19 @@ func TestMakeJSONAPI(t *testing.T) {
 }
 
 func TestMakeJSONAPICustomHeaders(t *testing.T) {
-	mock := MockJSONRequestHandler{func(req *http.Request) JSONResponse {
+	mock := MockJSONRequestHandler{func(_ *http.Request) util.JSONResponse {
 		headers := make(map[string]any)
 		headers["Custom"] = "Thing"
 		headers["X-Custom"] = "Things"
-		return JSONResponse{
+		return util.JSONResponse{
 			Code:    200,
 			JSON:    MockResponse{"yep"},
 			Headers: headers,
 		}
 	}}
-	mockReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
+	mockReq, _ := http.NewRequest(http.MethodGet, "http://example.com/foo", nil)
 	mockWriter := httptest.NewRecorder()
-	handlerFunc := MakeJSONAPI(&mock)
+	handlerFunc := util.MakeJSONAPI(&mock)
 	handlerFunc(mockWriter, mockReq)
 	if mockWriter.Code != 200 {
 		t.Errorf("TestMakeJSONAPICustomHeaders wanted HTTP status 200, got %d", mockWriter.Code)
@@ -87,13 +88,12 @@ func TestMakeJSONAPICustomHeaders(t *testing.T) {
 }
 
 func TestMakeJSONAPIRedirect(t *testing.T) {
-
-	mock := MockJSONRequestHandler{func(req *http.Request) JSONResponse {
-		return RedirectResponse("https://matrix.org")
+	mock := MockJSONRequestHandler{func(_ *http.Request) util.JSONResponse {
+		return util.RedirectResponse("https://matrix.org")
 	}}
-	mockReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
+	mockReq, _ := http.NewRequest(http.MethodGet, "http://example.com/foo", nil)
 	mockWriter := httptest.NewRecorder()
-	handlerFunc := MakeJSONAPI(&mock)
+	handlerFunc := util.MakeJSONAPI(&mock)
 	handlerFunc(mockWriter, mockReq)
 	if mockWriter.Code != 302 {
 		t.Errorf("TestMakeJSONAPIRedirect wanted HTTP status 302, got %d", mockWriter.Code)
@@ -105,14 +105,13 @@ func TestMakeJSONAPIRedirect(t *testing.T) {
 }
 
 func TestMakeJSONAPIError(t *testing.T) {
-
-	mock := MockJSONRequestHandler{func(req *http.Request) JSONResponse {
+	mock := MockJSONRequestHandler{func(_ *http.Request) util.JSONResponse {
 		err := errors.New("oops")
-		return ErrorResponse(err)
+		return util.ErrorResponse(err)
 	}}
-	mockReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
+	mockReq, _ := http.NewRequest(http.MethodGet, "http://example.com/foo", nil)
 	mockWriter := httptest.NewRecorder()
-	handlerFunc := MakeJSONAPI(&mock)
+	handlerFunc := util.MakeJSONAPI(&mock)
 	handlerFunc(mockWriter, mockReq)
 	if mockWriter.Code != 500 {
 		t.Errorf("TestMakeJSONAPIError wanted HTTP status 500, got %d", mockWriter.Code)
@@ -138,7 +137,7 @@ func TestIs2xx(t *testing.T) {
 		{500, false},
 	}
 	for _, test := range tests {
-		j := JSONResponse{
+		j := util.JSONResponse{
 			Code: test.Code,
 		}
 		actual := j.Is2xx()
@@ -149,29 +148,32 @@ func TestIs2xx(t *testing.T) {
 }
 
 func TestGetLogger(t *testing.T) {
-
-	entry := NewLogger(context.TODO(), DefaultLogOptions()).WithField("test", "yep")
-	mockReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
-	ctx := context.WithValue(mockReq.Context(), ctxValueLogger, entry)
+	entry := util.NewLogger(t.Context(), util.DefaultLogOptions()).WithField("test", "yep")
+	mockReq, _ := http.NewRequest(http.MethodGet, "http://example.com/foo", nil)
+	ctx := util.ContextWithLogger(mockReq.Context(), entry)
 	mockReq = mockReq.WithContext(ctx)
-	ctxLogger := Log(mockReq.Context())
+	ctxLogger := util.Log(mockReq.Context())
 	if ctxLogger != entry {
 		t.Errorf("TestGetLogger wanted logger '%v', got '%v'", entry, ctxLogger)
 	}
 
-	noLoggerInReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
-	ctxLogger = Log(noLoggerInReq.Context())
+	noLoggerInReq, _ := http.NewRequest(http.MethodGet, "http://example.com/foo", nil)
+	ctxLogger = util.Log(noLoggerInReq.Context())
 	if ctxLogger == nil {
 		t.Errorf("TestGetLogger wanted logger, got nil")
 	}
 }
 
 func TestProtect(t *testing.T) {
-
 	mockWriter := httptest.NewRecorder()
-	mockReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
-	mockReq = mockReq.WithContext(ContextWithLogger(mockReq.Context(), NewLogger(context.TODO(), DefaultLogOptions()).WithField("test", "yep")))
-	h := Protect(func(w http.ResponseWriter, req *http.Request) {
+	mockReq, _ := http.NewRequest(http.MethodGet, "http://example.com/foo", nil)
+	mockReq = mockReq.WithContext(
+		util.ContextWithLogger(
+			mockReq.Context(),
+			util.NewLogger(t.Context(), util.DefaultLogOptions()).WithField("test", "yep"),
+		),
+	)
+	h := util.Protect(func(_ http.ResponseWriter, _ *http.Request) {
 		panic("oh noes!")
 	})
 
@@ -190,10 +192,9 @@ func TestProtect(t *testing.T) {
 }
 
 func TestProtectWithoutLogger(t *testing.T) {
-
 	mockWriter := httptest.NewRecorder()
-	mockReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
-	h := Protect(func(w http.ResponseWriter, req *http.Request) {
+	mockReq, _ := http.NewRequest(http.MethodGet, "http://example.com/foo", nil)
+	h := util.Protect(func(_ http.ResponseWriter, _ *http.Request) {
 		panic("oh noes!")
 	})
 
@@ -212,12 +213,10 @@ func TestProtectWithoutLogger(t *testing.T) {
 }
 
 func TestWithCORSOptions(t *testing.T) {
-
 	mockWriter := httptest.NewRecorder()
-	mockReq, _ := http.NewRequest("OPTIONS", "http://example.com/foo", nil)
-	h := WithCORSOptions(func(w http.ResponseWriter, req *http.Request) {
-		w.WriteHeader(200)
-		_, _ = w.Write([]byte("yep"))
+	mockReq, _ := http.NewRequest(http.MethodOptions, "http://example.com/foo", nil)
+	h := util.WithCORSOptions(func(_ http.ResponseWriter, _ *http.Request) {
+		mockWriter.WriteString("yep")
 	})
 	h(mockWriter, mockReq)
 	if mockWriter.Code != 200 {
@@ -238,18 +237,17 @@ func TestWithCORSOptions(t *testing.T) {
 }
 
 func TestGetRequestID(t *testing.T) {
-
 	reqID := "alphabetsoup"
-	mockReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
-	ctx := context.WithValue(mockReq.Context(), ctxValueRequestID, reqID)
+	mockReq, _ := http.NewRequest(http.MethodGet, "http://example.com/foo", nil)
+	ctx := util.ContextWithRequestID(mockReq.Context(), reqID)
 	mockReq = mockReq.WithContext(ctx)
-	ctxReqID := GetRequestID(mockReq.Context())
+	ctxReqID := util.GetRequestID(mockReq.Context())
 	if reqID != ctxReqID {
 		t.Errorf("TestGetRequestID wanted request ID '%s', got '%s'", reqID, ctxReqID)
 	}
 
-	noReqIDInReq, _ := http.NewRequest("GET", "http://example.com/foo", nil)
-	ctxReqID = GetRequestID(noReqIDInReq.Context())
+	noReqIDInReq, _ := http.NewRequest(http.MethodGet, "http://example.com/foo", nil)
+	ctxReqID = util.GetRequestID(noReqIDInReq.Context())
 	if ctxReqID != "" {
 		t.Errorf("TestGetRequestID wanted empty request ID, got '%s'", ctxReqID)
 	}

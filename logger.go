@@ -16,6 +16,11 @@ import (
 // ctxValueLogger is the key to extract the LogEntry.
 const ctxValueLogger = contextKeys("logger")
 
+const (
+	CallerDepth  = 3
+	FileLineAttr = 4
+)
+
 // ContextWithLogger pushes a LogEntry instance into the supplied context for easier propagation.
 func ContextWithLogger(ctx context.Context, logger *LogEntry) context.Context {
 	return context.WithValue(ctx, ctxValueLogger, logger)
@@ -31,7 +36,7 @@ func Log(ctx context.Context) *LogEntry {
 	return NewLogger(ctx, DefaultLogOptions())
 }
 
-// SLog obtains an slog interface from the log entry in the context
+// SLog obtains an slog interface from the log entry in the context.
 func SLog(ctx context.Context) *slog.Logger {
 	return Log(ctx).SLog()
 }
@@ -86,7 +91,6 @@ func ParseLevel(levelStr string) (slog.Level, error) {
 }
 
 func NewLogger(ctx context.Context, opts *LogOptions) *LogEntry {
-
 	logLevel := opts.Level.Level()
 	outputWriter := os.Stdout
 	if logLevel >= slog.LevelError {
@@ -116,7 +120,6 @@ func (l *iLogger) clone(ctx context.Context) *iLogger {
 }
 
 func (l *iLogger) WithError(err error) {
-
 	l.log = l.log.With(tint.Err(err))
 }
 
@@ -167,7 +170,6 @@ func (l *iLogger) Warn(msg string, args ...any) {
 }
 
 func (l *iLogger) Error(msg string, args ...any) {
-
 	log := l.withFileLineNum()
 
 	if l.stackTraces {
@@ -175,11 +177,9 @@ func (l *iLogger) Error(msg string, args ...any) {
 	}
 
 	log.ErrorContext(l._ctx(), msg, args...)
-
 }
 
 func (l *iLogger) Fatal(msg string, args ...any) {
-
 	log := l.withFileLineNum()
 
 	if l.stackTraces {
@@ -189,7 +189,7 @@ func (l *iLogger) Fatal(msg string, args ...any) {
 	l.Exit(1)
 }
 
-func (l *iLogger) Panic(msg string, args ...any) {
+func (l *iLogger) Panic(msg string, _ ...any) {
 	panic(fmt.Sprintf(" %s\n%s\n", msg, debug.Stack()))
 }
 
@@ -205,14 +205,14 @@ func (l *iLogger) Enabled(ctx context.Context, level slog.Level) bool {
 }
 
 func (l *iLogger) withFileLineNum() *slog.Logger {
-	_, file, line, ok := runtime.Caller(3)
+	_, file, line, ok := runtime.Caller(CallerDepth)
 	if ok {
-		return l.log.With(tint.Attr(4, slog.Any("file", fmt.Sprintf("%s:%d", file, line))))
+		return l.log.With(tint.Attr(FileLineAttr, slog.Any("file", fmt.Sprintf("%s:%d", file, line))))
 	}
 	return l.log
 }
 
-// LogEntry Need a type to handle the chained calls
+// LogEntry Need a type to handle the chained calls.
 type LogEntry struct {
 	l *iLogger
 }
@@ -268,11 +268,10 @@ func (e *LogEntry) Error(msg string, args ...any) {
 
 func (e *LogEntry) Fatal(msg string, args ...any) {
 	e.l.Fatal(msg, args...)
-
 }
 
-func (e *LogEntry) Panic(msg string, args ...any) {
-	e.l.Panic(msg, args...)
+func (e *LogEntry) Panic(msg string, _ ...any) {
+	e.l.Panic(msg)
 }
 
 func (e *LogEntry) WithAttr(attr ...any) *LogEntry {

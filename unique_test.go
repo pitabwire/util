@@ -1,8 +1,9 @@
-package util
+package util_test
 
 import (
-	"sort"
 	"testing"
+
+	"github.com/pitabwire/util"
 )
 
 type sortBytes []byte
@@ -24,7 +25,7 @@ func TestUnique(t *testing.T) {
 	for _, test := range testCases {
 		input := []byte(test.Input)
 		want := test.Want
-		got := string(input[:Unique(sortBytes(input))])
+		got := string(input[:util.Unique(sortBytes(input))])
 		if got != want {
 			t.Fatal("Wanted ", want, " got ", got)
 		}
@@ -48,7 +49,7 @@ func TestUniquePicksLastDuplicate(t *testing.T) {
 		"avacado",
 		"cucumber",
 	}
-	got := input[:Unique(sortByFirstByte(input))]
+	got := input[:util.Unique(sortByFirstByte(input))]
 
 	if len(want) != len(got) {
 		t.Errorf("Wanted %#v got %#v", want, got)
@@ -63,34 +64,29 @@ func TestUniquePicksLastDuplicate(t *testing.T) {
 func TestUniquePanicsIfNotSorted(t *testing.T) {
 	defer func() {
 		if r := recover(); r == nil {
-			t.Error("Expected Unique() to panic on unsorted input but it didn't")
+			t.Errorf("Unique did not panic on unsorted input")
 		}
 	}()
-	Unique(sort.StringSlice{"out", "of", "order"})
+	unsorted := sortBytes{'b', 'a'}
+	_ = util.Unique(unsorted)
 }
 
 func TestUniqueStrings(t *testing.T) {
-	input := []string{
-		"badger", "badger", "badger", "badger",
-		"badger", "badger", "badger", "badger",
-		"badger", "badger", "badger", "badger",
-		"mushroom", "mushroom",
-		"badger", "badger", "badger", "badger",
-		"badger", "badger", "badger", "badger",
-		"badger", "badger", "badger", "badger",
-		"snake", "snake",
+	testCases := []struct {
+		Input []string
+		Want  []string
+	}{
+		{[]string{"b", "a", "a", "c"}, []string{"a", "b", "c"}},
 	}
-
-	want := []string{"badger", "mushroom", "snake"}
-
-	got := UniqueStrings(input)
-
-	if len(want) != len(got) {
-		t.Errorf("Wanted %#v got %#v", want, got)
-	}
-	for i := range want {
-		if want[i] != got[i] {
-			t.Errorf("Wanted %#v got %#v", want, got)
+	for _, test := range testCases {
+		got := util.UniqueStrings(test.Input)
+		if len(got) != len(test.Want) {
+			t.Errorf("Wanted %v got %v", test.Want, got)
+		}
+		for i := range got {
+			if got[i] != test.Want[i] {
+				t.Errorf("Wanted %v got %v", test.Want, got)
+			}
 		}
 	}
 }
