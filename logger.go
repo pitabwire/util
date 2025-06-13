@@ -233,8 +233,7 @@ func (e *LogEntry) Log(ctx context.Context, level slog.Level, msg string, fields
 	e.l.Log(ctx, level, msg, fields...)
 }
 func (e *LogEntry) Logf(ctx context.Context, level slog.Level, format string, args ...interface{}) {
-	e.l.Logf(ctx, level, fmt.Sprintf(format, args...))
-
+	e.l.Logf(ctx, level, format, args...)
 }
 
 func (e *LogEntry) Trace(msg string, args ...any) {
