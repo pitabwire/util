@@ -28,9 +28,17 @@ func TestMakeJSONAPI(t *testing.T) {
 		ExpectJSON string
 	}{
 		// MessageResponse return values
-		{util.MessageResponse(http.StatusInternalServerError, "Everything is broken"), http.StatusInternalServerError, `{"message":"Everything is broken"}`},
+		{
+			util.MessageResponse(http.StatusInternalServerError, "Everything is broken"),
+			http.StatusInternalServerError,
+			`{"message":"Everything is broken"}`,
+		},
 		// interface return values
-		{util.JSONResponse{http.StatusInternalServerError, MockResponse{"yep"}, nil}, http.StatusInternalServerError, `{"foo":"yep"}`},
+		{
+			util.JSONResponse{http.StatusInternalServerError, MockResponse{"yep"}, nil},
+			http.StatusInternalServerError,
+			`{"foo":"yep"}`,
+		},
 		// Error JSON return values which fail to be marshalled should fallback to text
 		{util.JSONResponse{http.StatusInternalServerError, struct {
 			Foo interface{} `json:"foo"`
@@ -38,7 +46,11 @@ func TestMakeJSONAPI(t *testing.T) {
 		// With different status codes
 		{util.JSONResponse{http.StatusCreated, MockResponse{"narp"}, nil}, http.StatusCreated, `{"foo":"narp"}`},
 		// Top-level array success values
-		{util.JSONResponse{http.StatusOK, []MockResponse{{"yep"}, {"narp"}}, nil}, http.StatusOK, `[{"foo":"yep"},{"foo":"narp"}]`},
+		{
+			util.JSONResponse{http.StatusOK, []MockResponse{{"yep"}, {"narp"}}, nil},
+			http.StatusOK,
+			`[{"foo":"yep"},{"foo":"narp"}]`,
+		},
 	}
 
 	for _, tst := range tests {

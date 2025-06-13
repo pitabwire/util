@@ -154,8 +154,7 @@ func respond(w http.ResponseWriter, req *http.Request, res JSONResponse) {
 			// Check if the value is already a headerValues
 			if reflect.TypeOf(val).Kind() == reflect.Slice {
 				v := reflect.ValueOf(val)
-				for i := 0; i < v.Len(); i++ {
-					// TODO: Go 1.22+ integer range: for i := range v.Len() { ... }
+				for i := range v.Len() {
 					headerValues = append(headerValues, v.Index(i).Interface())
 				}
 			} else {
