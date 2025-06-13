@@ -1,7 +1,6 @@
 package util_test
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -9,8 +8,9 @@ import (
 	"github.com/pitabwire/util"
 )
 
+// TestLogs tests basic logging functionality.
 func TestLogs(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	logger := util.NewLogger(ctx, util.DefaultLogOptions())
 	logger.Info("test")
 	logger.Debug("debugging")
@@ -36,8 +36,9 @@ func TestLogs(t *testing.T) {
 	defer withLog3.Release()
 }
 
+// TestStackTraceLogs tests logging with stack traces.
 func TestStackTraceLogs(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	defaultLogs := util.DefaultLogOptions()
 	defaultLogs.ShowStackTrace = true
 	logger := util.NewLogger(ctx, defaultLogs)
@@ -49,8 +50,9 @@ func TestStackTraceLogs(t *testing.T) {
 	defer logger.Release()
 }
 
+// TestPanicLogs tests panic recovery in logging.
 func TestPanicLogs(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	defaultLogs := util.DefaultLogOptions()
 	logger := util.NewLogger(ctx, defaultLogs)
 
@@ -80,27 +82,29 @@ func TestPanicLogs(t *testing.T) {
 	t.Error("execution continued past panic point")
 }
 
-// BenchmarkLoggerWithField benchmarks the logger WithField method to measure performance
+// BenchmarkLoggerWithField benchmarks the logger WithField method to measure performance.
 func BenchmarkLoggerWithField(b *testing.B) {
-	ctx := context.Background()
+	ctx := b.Context()
 	logger := util.NewLogger(ctx, util.DefaultLogOptions())
 	defer logger.Release()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	b.ReportAllocs()
+	for range b.N {
 		l := logger.WithField("key", "value")
 		l.Release() // Important to return to the pool
 	}
 }
 
-// BenchmarkLoggerMultipleWithField benchmarks chaining multiple WithField calls
+// BenchmarkLoggerMultipleWithField benchmarks chaining multiple WithField calls.
 func BenchmarkLoggerMultipleWithField(b *testing.B) {
-	ctx := context.Background()
+	ctx := b.Context()
 	logger := util.NewLogger(ctx, util.DefaultLogOptions())
 	defer logger.Release()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	b.ReportAllocs()
+	for range b.N {
 		l := logger.WithField("key1", "value1").
 			WithField("key2", "value2").
 			WithField("key3", "value3")
@@ -108,34 +112,34 @@ func BenchmarkLoggerMultipleWithField(b *testing.B) {
 	}
 }
 
-// BenchmarkLoggerWithoutPooling simulates the overhead without using pools
+// BenchmarkLoggerWithoutPooling simulates the overhead without using pools.
 func BenchmarkLoggerWithoutPooling(b *testing.B) {
-	ctx := context.Background()
-	logger := util.NewLogger(ctx, util.DefaultLogOptions())
-	defer logger.Release()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		// Intentionally creating and dropping references without explicit release
-		_ = logger.WithField("key1", "value1").
-			WithField("key2", "value2").
-			WithField("key3", "value3")
-		// No release call - this shows the cost of GC handling these objects
-	}
-}
-
-// BenchmarkLogAllocation measures allocation in logging operations
-func BenchmarkLogAllocation(b *testing.B) {
-	ctx := context.Background()
+	ctx := b.Context()
 	logger := util.NewLogger(ctx, util.DefaultLogOptions())
 	defer logger.Release()
 
 	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
+		// Intentionally creating and dropping references without explicit release
+		_ = logger.WithField("key1", "value1").
+			WithField("key2", "value2").
+			WithField("key3", "value3")
+	}
+}
+
+// BenchmarkLogAllocation measures allocation in logging operations.
+func BenchmarkLogAllocation(b *testing.B) {
+	ctx := b.Context()
+	logger := util.NewLogger(ctx, util.DefaultLogOptions())
+	defer logger.Release()
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := range b.N {
 		// Typical logging pattern: context with some fields then log
 		l := logger.WithField("request_id", fmt.Sprintf("req-%d", i))
 		l.Info("Processing request", "index", i)
-		l.Release()
+		l.Release() // Important to return to the pool
 	}
 }
