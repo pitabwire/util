@@ -118,9 +118,6 @@ func (l *iLogger) clone(ctx context.Context) *iLogger {
 func (l *iLogger) WithError(err error) {
 
 	l.log = l.log.With(tint.Err(err))
-	if l.stackTraces {
-		l.log = l.log.With("stacktrace", string(debug.Stack()))
-	}
 }
 
 func (l *iLogger) WithAttr(attr ...any) {
@@ -173,18 +170,27 @@ func (l *iLogger) Error(msg string, args ...any) {
 
 	log := l.withFileLineNum()
 
+	if l.stackTraces {
+		log.ErrorContext(l._ctx(), fmt.Sprintf(" %s\n%s\n", msg, debug.Stack()), args...)
+	}
+
 	log.ErrorContext(l._ctx(), msg, args...)
 
 }
 
 func (l *iLogger) Fatal(msg string, args ...any) {
+
+	log := l.withFileLineNum()
+
+	if l.stackTraces {
+		log.ErrorContext(l._ctx(), fmt.Sprintf(" %s\n%s\n", msg, debug.Stack()), args...)
+	}
 	l.log.ErrorContext(l._ctx(), msg, args...)
 	l.Exit(1)
 }
 
 func (l *iLogger) Panic(msg string, args ...any) {
-	l.log.ErrorContext(l._ctx(), msg, args...)
-	panic(msg)
+	panic(fmt.Sprintf(" %s\n%s\n", msg, debug.Stack()))
 }
 
 func (l *iLogger) Exit(code int) {
