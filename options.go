@@ -8,127 +8,107 @@ import (
 	"github.com/lmittmann/tint"
 )
 
-// HandlerCreator is a function type that creates and returns an slog.Handler based on configuration.
-type HandlerCreator func(writer io.Writer, options *LogOptions) slog.Handler
+// logOptions contains configuration for the logging system.
+// This is intentionally kept private to hide implementation details.
+type logOptions struct {
+	// level defines the minimum log level that will be output
+	level slog.Level
 
-// LogOptions contains configuration for the logging system.
-type LogOptions struct {
-	// Level defines the minimum log level that will be output
-	Level slog.Level
+	// addSource determines whether source code position should be added to log entries
+	addSource bool
 
-	// AddSource determines whether source code position should be added to log entries
-	AddSource bool
+	// timeFormat defines how timestamps are formatted in logs
+	timeFormat string
 
-	// TimeFormat defines how timestamps are formatted in logs
-	TimeFormat string
+	// noColor disables colored output when set to true
+	noColor bool
 
-	// NoColor disables colored output when set to true
-	NoColor bool
+	// showStackTrace enables automatic stack trace printing for Error and Fatal logs
+	showStackTrace bool
 
-	// ShowStackTrace enables automatic stack trace printing for Error and Fatal logs
-	ShowStackTrace bool
+	// output specifies the destination for log output (defaults to os.Stdout or os.Stderr based on level)
+	output io.Writer
 
-	// EnableTracing enables OpenTelemetry trace context propagation
-	EnableTracing bool
-
-	// Output specifies the destination for log output (defaults to os.Stdout or os.Stderr based on level)
-	Output io.Writer
-
-	// Handler specifies a custom slog.Handler implementation to use
-	Handler slog.Handler
-
-	// HandlerCreator is a function that creates a handler (used if Handler is not set)
-	HandlerCreator HandlerCreator
+	// handler specifies a custom slog.Handler implementation to use
+	handler slog.Handler
 }
 
-// DefaultLogOptions returns a LogOptions instance with sensible defaults.
-func DefaultLogOptions() *LogOptions {
-	return &LogOptions{
-		Level:          slog.LevelInfo,
-		AddSource:      false,
-		TimeFormat:     time.DateTime,
-		NoColor:        false,
-		ShowStackTrace: false,
-		HandlerCreator: DefaultHandlerCreator,
+// Option is a function that configures logOptions.
+type Option func(*logOptions)
+
+// defaultLogOptions returns a logOptions instance with sensible defaults.
+func defaultLogOptions() *logOptions {
+	return &logOptions{
+		level:          slog.LevelInfo,
+		addSource:      false,
+		timeFormat:     time.DateTime,
+		noColor:        false,
+		showStackTrace: false,
 	}
 }
 
-// DefaultHandlerCreator creates the default tint-based colored slog.Handler.
-func DefaultHandlerCreator(writer io.Writer, opts *LogOptions) slog.Handler {
+// defaultHandlerCreator creates the default tint-based colored slog.Handler.
+func defaultHandlerCreator(writer io.Writer, opts *logOptions) slog.Handler {
 	handlerOptions := &tint.Options{
-		AddSource:  opts.AddSource,
-		Level:      opts.Level,
-		TimeFormat: opts.TimeFormat,
-		NoColor:    opts.NoColor,
+		AddSource:  opts.addSource,
+		Level:      opts.level,
+		TimeFormat: opts.timeFormat,
+		NoColor:    opts.noColor,
 	}
 
 	return tint.NewHandler(writer, handlerOptions)
 }
 
-// WithLevel returns a new LogOptions with the specified level.
-func (o *LogOptions) WithLevel(level slog.Level) *LogOptions {
-	clone := *o
-	clone.Level = level
-	return &clone
+// WithLogLevel sets the log level.
+func WithLogLevel(level slog.Level) Option {
+	return func(o *logOptions) {
+		o.level = level
+	}
 }
 
-// WithAddSource returns a new LogOptions with the AddSource option set.
-func (o *LogOptions) WithAddSource(addSource bool) *LogOptions {
-	clone := *o
-	clone.AddSource = addSource
-	return &clone
+// WithLogAddSource enables or disables source code position in log entries.
+func WithLogAddSource(addSource bool) Option {
+	return func(o *logOptions) {
+		o.addSource = addSource
+	}
 }
 
-// WithTimeFormat returns a new LogOptions with the specified time format.
-func (o *LogOptions) WithTimeFormat(format string) *LogOptions {
-	clone := *o
-	clone.TimeFormat = format
-	return &clone
+// WithLogTimeFormat sets the time format for log timestamps.
+func WithLogTimeFormat(format string) Option {
+	return func(o *logOptions) {
+		o.timeFormat = format
+	}
 }
 
-// WithNoColor returns a new LogOptions with the NoColor option set.
-func (o *LogOptions) WithNoColor(noColor bool) *LogOptions {
-	clone := *o
-	clone.NoColor = noColor
-	return &clone
+// WithLogNoColor enables or disables colored output.
+func WithLogNoColor(noColor bool) Option {
+	return func(o *logOptions) {
+		o.noColor = noColor
+	}
 }
 
-// WithStackTrace returns a new LogOptions with the ShowStackTrace option set.
-func (o *LogOptions) WithStackTrace(showStackTrace bool) *LogOptions {
-	clone := *o
-	clone.ShowStackTrace = showStackTrace
-	return &clone
+// WithLogStackTrace enables automatic stack trace printing.
+func WithLogStackTrace() Option {
+	return func(o *logOptions) {
+		o.showStackTrace = true
+	}
 }
 
-// WithTracing returns a new LogOptions with the EnableTracing option set.
-func (o *LogOptions) WithTracing(enableTracing bool) *LogOptions {
-	clone := *o
-	clone.EnableTracing = enableTracing
-	return &clone
+// WithLogOutput sets the output writer for logs.
+func WithLogOutput(output io.Writer) Option {
+	return func(o *logOptions) {
+		o.output = output
+	}
 }
 
-// WithOutput returns a new LogOptions with the specified output writer.
-func (o *LogOptions) WithOutput(output io.Writer) *LogOptions {
-	clone := *o
-	clone.Output = output
-	return &clone
+// WithLogHandler sets a custom slog.Handler implementation.
+func WithLogHandler(handler slog.Handler) Option {
+	return func(o *logOptions) {
+		o.handler = handler
+	}
 }
 
-// WithHandler returns a new LogOptions with the specified handler.
-func (o *LogOptions) WithHandler(handler slog.Handler) *LogOptions {
-	clone := *o
-	clone.Handler = handler
-	return &clone
-}
-
-// WithHandlerCreator returns a new LogOptions with the specified handler creator function.
-func (o *LogOptions) WithHandlerCreator(creator HandlerCreator) *LogOptions {
-	clone := *o
-	clone.HandlerCreator = creator
-	return &clone
-}
-
-// ParseLevel converts a string to a log.Level.
+// ParseLevel converts a string to a log.level.
 // It is case-insensitive.
 // Returns an error if the string does not match a known level.
 func ParseLevel(levelStr string) (slog.Level, error) {

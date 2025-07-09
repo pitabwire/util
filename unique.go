@@ -35,7 +35,7 @@ func Unique(data sort.Interface) int {
 			j++
 		}
 	}
-	// Output the last element.
+	// output the last element.
 	data.Swap(length-1, j)
 	return j + 1
 }

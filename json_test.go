@@ -160,7 +160,7 @@ func TestIs2xx(t *testing.T) {
 }
 
 func TestGetLogger(t *testing.T) {
-	entry := util.NewLogger(t.Context(), util.DefaultLogOptions()).WithField("test", "yep")
+	entry := util.NewLogger(t.Context()).WithField("test", "yep")
 	mockReq, _ := http.NewRequest(http.MethodGet, "http://example.com/foo", nil)
 	ctx := util.ContextWithLogger(mockReq.Context(), entry)
 	mockReq = mockReq.WithContext(ctx)
@@ -182,7 +182,7 @@ func TestProtect(t *testing.T) {
 	mockReq = mockReq.WithContext(
 		util.ContextWithLogger(
 			mockReq.Context(),
-			util.NewLogger(t.Context(), util.DefaultLogOptions()).WithField("test", "yep"),
+			util.NewLogger(t.Context()).WithField("test", "yep"),
 		),
 	)
 	h := util.Protect(func(_ http.ResponseWriter, _ *http.Request) {
@@ -228,7 +228,7 @@ func TestWithCORSOptions(t *testing.T) {
 	mockWriter := httptest.NewRecorder()
 	mockReq, _ := http.NewRequest(http.MethodOptions, "http://example.com/foo", nil)
 	h := util.WithCORSOptions(func(_ http.ResponseWriter, _ *http.Request) {
-		mockWriter.WriteString("yep")
+		_, _ = mockWriter.WriteString("yep")
 	})
 	h(mockWriter, mockReq)
 	if mockWriter.Code != 200 {

@@ -38,7 +38,7 @@ func Log(ctx context.Context) *LogEntry {
 		}
 	}
 
-	return NewLogger(ctx, DefaultLogOptions())
+	return NewLogger(ctx)
 }
 
 // SLog obtains an slog interface from the log entry in the context.
@@ -61,14 +61,20 @@ var logEntryPool = sync.Pool{
 }
 
 // NewLogger creates a new instance of LogEntry with the provided context and options.
-func NewLogger(ctx context.Context, opts *LogOptions) *LogEntry {
+func NewLogger(ctx context.Context, opts ...Option) *LogEntry {
+	// Start with default options and apply provided options
+	options := defaultLogOptions()
+	for _, opt := range opts {
+		opt(options)
+	}
+
 	// Determine output writer
 	var outputWriter io.Writer
 
-	if opts.Output != nil {
-		outputWriter = opts.Output
+	if options.output != nil {
+		outputWriter = options.output
 	} else {
-		if opts.Level >= slog.LevelError {
+		if options.level >= slog.LevelError {
 			outputWriter = os.Stderr
 		} else {
 			outputWriter = os.Stdout
@@ -78,13 +84,11 @@ func NewLogger(ctx context.Context, opts *LogOptions) *LogEntry {
 	// Create handler - use the specified handler or create one using the handler creator.
 	var handler slog.Handler
 	switch {
-	case opts.Handler != nil:
-		handler = opts.Handler
-	case opts.HandlerCreator != nil:
-		handler = opts.HandlerCreator(outputWriter, opts)
+	case options.handler != nil:
+		handler = options.handler
 	default:
 		// Fallback to default handler if no handler or creator specified
-		handler = DefaultHandlerCreator(outputWriter, opts)
+		handler = defaultHandlerCreator(outputWriter, options)
 	}
 
 	// Create logger
@@ -100,7 +104,7 @@ func NewLogger(ctx context.Context, opts *LogOptions) *LogEntry {
 
 	entry.ctx = ctx
 	entry.log = log
-	entry.stackTraces = opts.ShowStackTrace
+	entry.stackTraces = options.showStackTrace
 
 	return entry
 }
@@ -123,7 +127,7 @@ func (e *LogEntry) Release() {
 // clone creates a new LogEntry with the same properties as the original.
 func (e *LogEntry) clone() *LogEntry {
 	if e == nil {
-		return NewLogger(context.Background(), DefaultLogOptions())
+		return NewLogger(context.Background())
 	}
 
 	// Get a new entry from the pool

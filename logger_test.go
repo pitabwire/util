@@ -11,7 +11,7 @@ import (
 // TestLogs tests basic logging functionality.
 func TestLogs(t *testing.T) {
 	ctx := t.Context()
-	logger := util.NewLogger(ctx, util.DefaultLogOptions())
+	logger := util.NewLogger(ctx)
 	logger.Info("test")
 	logger.Debug("debugging")
 	logger.Error("error occurred")
@@ -39,9 +39,7 @@ func TestLogs(t *testing.T) {
 // TestStackTraceLogs tests logging with stack traces.
 func TestStackTraceLogs(t *testing.T) {
 	ctx := t.Context()
-	defaultLogs := util.DefaultLogOptions()
-	defaultLogs.ShowStackTrace = true
-	logger := util.NewLogger(ctx, defaultLogs)
+	logger := util.NewLogger(ctx, util.WithLogStackTrace())
 	logger.Debug("testing debug logs")
 	logger.Info("testing logs")
 
@@ -53,8 +51,7 @@ func TestStackTraceLogs(t *testing.T) {
 // TestPanicLogs tests panic recovery in logging.
 func TestPanicLogs(t *testing.T) {
 	ctx := t.Context()
-	defaultLogs := util.DefaultLogOptions()
-	logger := util.NewLogger(ctx, defaultLogs)
+	logger := util.NewLogger(ctx)
 
 	logger.Info("testing logs")
 	defer logger.Release()
@@ -85,7 +82,7 @@ func TestPanicLogs(t *testing.T) {
 // BenchmarkLoggerWithField benchmarks the logger WithField method to measure performance.
 func BenchmarkLoggerWithField(b *testing.B) {
 	ctx := b.Context()
-	logger := util.NewLogger(ctx, util.DefaultLogOptions())
+	logger := util.NewLogger(ctx)
 	defer logger.Release()
 
 	b.ResetTimer()
@@ -99,7 +96,7 @@ func BenchmarkLoggerWithField(b *testing.B) {
 // BenchmarkLoggerMultipleWithField benchmarks chaining multiple WithField calls.
 func BenchmarkLoggerMultipleWithField(b *testing.B) {
 	ctx := b.Context()
-	logger := util.NewLogger(ctx, util.DefaultLogOptions())
+	logger := util.NewLogger(ctx)
 	defer logger.Release()
 
 	b.ResetTimer()
@@ -115,7 +112,7 @@ func BenchmarkLoggerMultipleWithField(b *testing.B) {
 // BenchmarkLoggerWithoutPooling simulates the overhead without using pools.
 func BenchmarkLoggerWithoutPooling(b *testing.B) {
 	ctx := b.Context()
-	logger := util.NewLogger(ctx, util.DefaultLogOptions())
+	logger := util.NewLogger(ctx)
 	defer logger.Release()
 
 	b.ResetTimer()
@@ -131,7 +128,7 @@ func BenchmarkLoggerWithoutPooling(b *testing.B) {
 // BenchmarkLogAllocation measures allocation in logging operations.
 func BenchmarkLogAllocation(b *testing.B) {
 	ctx := b.Context()
-	logger := util.NewLogger(ctx, util.DefaultLogOptions())
+	logger := util.NewLogger(ctx)
 	defer logger.Release()
 
 	b.ResetTimer()
