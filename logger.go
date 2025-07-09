@@ -3,15 +3,13 @@ package util
 import (
 	"context"
 	"fmt"
+	"github.com/lmittmann/tint"
+	"io"
 	"log/slog"
 	"os"
 	"runtime"
 	"runtime/debug"
-	"strings"
 	"sync"
-	"time"
-
-	"github.com/lmittmann/tint"
 )
 
 // contextKeyType is used as a type-safe key for context values.
@@ -61,63 +59,35 @@ var logEntryPool = sync.Pool{
 	},
 }
 
-type LogOptions struct {
-	*slog.HandlerOptions
-	PrintFormat    string
-	TimeFormat     string
-	NoColor        bool
-	ShowStackTrace bool
-}
-
-func DefaultLogOptions() *LogOptions {
-	return &LogOptions{
-		HandlerOptions: &slog.HandlerOptions{
-			AddSource: false,
-			Level:     slog.LevelInfo,
-		},
-		PrintFormat:    "",
-		TimeFormat:     time.DateTime,
-		NoColor:        false,
-		ShowStackTrace: false,
-	}
-}
-
-// ParseLevel converts a string to a log.Level.
-// It is case-insensitive.
-// Returns an error if the string does not match a known level.
-func ParseLevel(levelStr string) (slog.Level, error) {
-	switch strings.ToLower(levelStr) {
-	case "debug", "trace":
-		return slog.LevelDebug, nil
-	case "info":
-		return slog.LevelInfo, nil
-	case "warn", "warning": // Add "warning" as an alias for "warn" if desired
-		return slog.LevelWarn, nil
-	case "error", "fatal", "panic":
-		return slog.LevelError, nil
-	default:
-		// Default to Info or return an error for unrecognized strings
-		return slog.LevelInfo, fmt.Errorf("unknown log level: %q", levelStr)
-	}
-}
-
 // NewLogger creates a new instance of LogEntry with the provided context and options.
 func NewLogger(ctx context.Context, opts *LogOptions) *LogEntry {
-	logLevel := opts.Level.Level()
-	outputWriter := os.Stdout
-	if logLevel >= slog.LevelError {
-		outputWriter = os.Stderr
+	// Determine output writer
+	var outputWriter io.Writer
+
+	if opts.Output != nil {
+		outputWriter = opts.Output
+	} else {
+
+		if opts.Level >= slog.LevelError {
+			outputWriter = os.Stderr
+		} else {
+			outputWriter = os.Stdout
+		}
 	}
 
-	handlerOptions := &tint.Options{
-		AddSource:  opts.AddSource,
-		Level:      logLevel,
-		TimeFormat: opts.TimeFormat,
-		NoColor:    opts.NoColor,
+	// Create handler - use the specified handler or create one using the handler creator.
+	var handler slog.Handler
+	if opts.Handler != nil {
+		handler = opts.Handler
+	} else if opts.HandlerCreator != nil {
+		handler = opts.HandlerCreator(outputWriter, opts)
+	} else {
+		// Fallback to default handler if no handler or creator specified
+		handler = DefaultHandlerCreator(outputWriter, opts)
 	}
 
-	tintHandler := tint.NewHandler(outputWriter, handlerOptions)
-	log := slog.New(tintHandler)
+	// Create logger
+	log := slog.New(handler)
 	slog.SetDefault(log)
 
 	// Get a LogEntry from the pool
