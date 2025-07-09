@@ -3,13 +3,14 @@ package util
 import (
 	"context"
 	"fmt"
-	"github.com/lmittmann/tint"
 	"io"
 	"log/slog"
 	"os"
 	"runtime"
 	"runtime/debug"
 	"sync"
+
+	"github.com/lmittmann/tint"
 )
 
 // contextKeyType is used as a type-safe key for context values.
@@ -67,7 +68,6 @@ func NewLogger(ctx context.Context, opts *LogOptions) *LogEntry {
 	if opts.Output != nil {
 		outputWriter = opts.Output
 	} else {
-
 		if opts.Level >= slog.LevelError {
 			outputWriter = os.Stderr
 		} else {
@@ -77,11 +77,12 @@ func NewLogger(ctx context.Context, opts *LogOptions) *LogEntry {
 
 	// Create handler - use the specified handler or create one using the handler creator.
 	var handler slog.Handler
-	if opts.Handler != nil {
+	switch {
+	case opts.Handler != nil:
 		handler = opts.Handler
-	} else if opts.HandlerCreator != nil {
+	case opts.HandlerCreator != nil:
 		handler = opts.HandlerCreator(outputWriter, opts)
-	} else {
+	default:
 		// Fallback to default handler if no handler or creator specified
 		handler = DefaultHandlerCreator(outputWriter, opts)
 	}

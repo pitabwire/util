@@ -1,7 +1,6 @@
 package util_test
 
 import (
-	"context"
 	"io"
 	"log/slog"
 	"os"
@@ -25,7 +24,7 @@ func TestCustomHandler(t *testing.T) {
 		WithLevel(slog.LevelDebug)
 
 	// Create a new logger with the custom handler
-	logger := util.NewLogger(context.Background(), options)
+	logger := util.NewLogger(t.Context(), options)
 	defer logger.Release() // Return to pool when done
 
 	// Log some messages
@@ -48,7 +47,7 @@ func TestDirectHandlerUsage(t *testing.T) {
 		WithStackTrace(true)
 
 	// Create a new logger with the direct handler
-	logger := util.NewLogger(context.Background(), options)
+	logger := util.NewLogger(t.Context(), options)
 	defer logger.Release() // Return to pool when done
 
 	// Log some messages
@@ -59,7 +58,7 @@ func TestDirectHandlerUsage(t *testing.T) {
 	// (Text-formatted log output)
 }
 
-// TestTelemetryHandler tests using the OpenTelemetry handler
+// TestTelemetryHandler tests using the OpenTelemetry handler.
 func TestTelemetryHandler(t *testing.T) {
 	// Create options with telemetry enabled
 	options := util.DefaultLogOptions().
@@ -73,7 +72,7 @@ func TestTelemetryHandler(t *testing.T) {
 	logger.Info("This message will include OpenTelemetry trace context")
 }
 
-// TestCustomOutputWriter tests using a custom output writer
+// TestCustomOutputWriter tests using a custom output writer.
 func TestCustomOutputWriter(t *testing.T) {
 	// Create a buffer to capture logs
 	var buf io.Writer = os.Stderr
