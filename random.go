@@ -12,7 +12,6 @@ const alphanumerics = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234
 
 // RandomString generates a cryptographically secure random string of length n.
 func RandomString(n int) string {
-
 	if n <= 0 {
 		return ""
 	}
