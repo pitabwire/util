@@ -1,6 +1,5 @@
 // Package util provides utility functions and helpers for common operations.
-//
-
+//nolint:revive // util is an established package name in this codebase
 package util
 
 import (
