@@ -1,3 +1,5 @@
+// Package util provides utility functions and helpers for common operations.
+// revive:disable:var-naming
 package util
 
 import (
