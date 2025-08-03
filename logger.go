@@ -161,7 +161,7 @@ func (e *LogEntry) WithError(err error) *LogEntry {
 
 // WithField returns a new LogEntry with the field added.
 func (e *LogEntry) WithField(key string, value any) *LogEntry {
-	return e.With(key, value)
+	return e.With(slog.Any(key, value))
 }
 
 // With returns a new LogEntry with the provided attributes added.
@@ -238,15 +238,36 @@ func (e *LogEntry) Fatal(msg string, args ...any) {
 	log := e.withFileLineNum()
 
 	if e.stackTraces {
-		log.ErrorContext(e._ctx(), fmt.Sprintf(" %s\n%s\n", msg, debug.Stack()), args...)
+		log.ErrorContext(e._ctx(), fmt.Sprintf("%s\n%s", msg, debug.Stack()), args...)
+	} else {
+		log.ErrorContext(e._ctx(), msg, args...)
 	}
-	e.log.ErrorContext(e._ctx(), msg, args...)
+
+	// Release the LogEntry back to the pool before exiting
+	e.Release()
 	e.Exit(1)
 }
 
-// Panic logs a message and panics.
-func (e *LogEntry) Panic(msg string, _ ...any) {
-	panic(fmt.Sprintf(" %s\n%s\n", msg, debug.Stack()))
+// Panic logs a message at error level and panics.
+func (e *LogEntry) Panic(msg string, args ...any) {
+	log := e.withFileLineNum()
+
+	var panicMsg string
+	if e.stackTraces {
+		formattedMsg := fmt.Sprintf("%s\n%s", msg, debug.Stack())
+		log.ErrorContext(e._ctx(), formattedMsg, args...)
+		panicMsg = formattedMsg
+	} else {
+		log.ErrorContext(e._ctx(), msg, args...)
+		panicMsg = msg
+	}
+
+	// Format the panic message with args if provided
+	if len(args) > 0 {
+		panicMsg = fmt.Sprintf(panicMsg+" %v", args)
+	}
+
+	panic(panicMsg)
 }
 
 // Exit terminates the application with the given code.
