@@ -84,14 +84,7 @@ func NewLogger(ctx context.Context, opts ...Option) *LogEntry {
 	}
 
 	// Create handler - use the specified handler or create one using the handler creator.
-	var handler slog.Handler
-	switch {
-	case options.handler != nil:
-		handler = options.handler
-	default:
-		// Fallback to default handler if no handler or creator specified
-		handler = defaultHandlerCreator(outputWriter, options)
-	}
+	handler := defaultHandlerCreator(outputWriter, options)
 
 	// Create logger
 	log := slog.New(handler)
@@ -162,6 +155,15 @@ func (e *LogEntry) WithError(err error) *LogEntry {
 // WithField returns a new LogEntry with the field added.
 func (e *LogEntry) WithField(key string, value any) *LogEntry {
 	return e.With(slog.Any(key, value))
+}
+
+// WithFields returns a new LogEntry with the supplied fields added.
+func (e *LogEntry) WithFields(fields map[string]any) *LogEntry {
+	var data []any
+	for k, v := range fields {
+		data = append(data, k, v)
+	}
+	return e.With(data...)
 }
 
 // With returns a new LogEntry with the provided attributes added.
@@ -297,4 +299,50 @@ func (e *LogEntry) withFileLineNum() *slog.Logger {
 		return e.log.With(tint.Attr(FileLineAttr, slog.Any("file", fmt.Sprintf("%s:%d", file, line))))
 	}
 	return e.log
+}
+
+// MultiHandler writes logs to multiple slog handlers (e.g. console + OTel).
+type MultiHandler struct {
+	handlers []slog.Handler
+}
+
+func (m *MultiHandler) extendHandler(h ...slog.Handler) {
+	m.handlers = append(m.handlers, h...)
+}
+
+func (m *MultiHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	var enabled bool
+	for _, h := range m.handlers {
+		if h.Enabled(ctx, level) {
+			enabled = true
+		}
+	}
+	return enabled
+}
+
+func (m *MultiHandler) Handle(ctx context.Context, r slog.Record) error {
+	var err error
+	for _, h := range m.handlers {
+		err = h.Handle(ctx, r)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *MultiHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	hs := make([]slog.Handler, len(m.handlers))
+	for i, h := range m.handlers {
+		hs[i] = h.WithAttrs(attrs)
+	}
+	return &MultiHandler{hs}
+}
+
+func (m *MultiHandler) WithGroup(name string) slog.Handler {
+	hs := make([]slog.Handler, len(m.handlers))
+	for i, h := range m.handlers {
+		hs[i] = h.WithGroup(name)
+	}
+	return &MultiHandler{hs}
 }

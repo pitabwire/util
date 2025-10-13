@@ -33,6 +33,9 @@ type logOptions struct {
 
 	// handler specifies a custom slog.Handler implementation to use
 	handler slog.Handler
+
+	// handlerExclusive enforces that only the set handler is utilized
+	handlerExclusive bool
 }
 
 // Option is a function that configures logOptions.
@@ -41,16 +44,27 @@ type Option func(*logOptions)
 // defaultLogOptions returns a logOptions instance with sensible defaults.
 func defaultLogOptions() *logOptions {
 	return &logOptions{
-		level:          slog.LevelInfo,
-		addSource:      false,
-		timeFormat:     time.DateTime,
-		noColor:        false,
-		showStackTrace: false,
+		level:            slog.LevelInfo,
+		addSource:        false,
+		timeFormat:       time.DateTime,
+		noColor:          false,
+		showStackTrace:   false,
+		handlerExclusive: false,
 	}
 }
 
 // defaultHandlerCreator creates the default tint-based colored slog.Handler.
 func defaultHandlerCreator(writer io.Writer, opts *logOptions) slog.Handler {
+	if opts == nil {
+		opts = defaultLogOptions()
+	}
+
+	if opts.handler != nil {
+		if opts.handlerExclusive {
+			return opts.handler
+		}
+	}
+
 	handlerOptions := &tint.Options{
 		AddSource:  opts.addSource,
 		Level:      opts.level,
@@ -58,7 +72,15 @@ func defaultHandlerCreator(writer io.Writer, opts *logOptions) slog.Handler {
 		NoColor:    opts.noColor,
 	}
 
-	return tint.NewHandler(writer, handlerOptions)
+	stdHandler := tint.NewHandler(writer, handlerOptions)
+
+	multiHandler := &MultiHandler{handlers: []slog.Handler{stdHandler}}
+
+	if opts.handler != nil {
+		multiHandler.extendHandler(opts.handler)
+	}
+
+	return multiHandler
 }
 
 // WithLogLevel sets the log level.
@@ -107,6 +129,13 @@ func WithLogOutput(output io.Writer) Option {
 func WithLogHandler(handler slog.Handler) Option {
 	return func(o *logOptions) {
 		o.handler = handler
+	}
+}
+
+// WithLogHandlerExclusive sets slog.Handler to be exclusively utilized.
+func WithLogHandlerExclusive() Option {
+	return func(o *logOptions) {
+		o.handlerExclusive = true
 	}
 }
 
