@@ -22,6 +22,8 @@ const ctxValueLogger contextKeyType = "logger"
 const (
 	CallerDepth  = 2
 	FileLineAttr = "caller"
+	// fieldsSliceMultiplier is used to preallocate slice capacity for fields.
+	fieldsSliceMultiplier = 2
 )
 
 // ContextWithLogger associates a logger with the context.
@@ -51,7 +53,7 @@ type LogEntry struct {
 	stackTraces bool
 }
 
-var logEntryPool = sync.Pool{
+var logEntryPool = sync.Pool{ //nolint:gochecknoglobals // sync.Pool requires global variable for efficiency
 	New: func() interface{} { return new(LogEntry) },
 }
 
@@ -63,18 +65,24 @@ func NewLogger(ctx context.Context, opts ...Option) *LogEntry {
 	}
 
 	var out io.Writer
-	if options.output != nil {
+	switch {
+	case options.output != nil:
 		out = options.output
-	} else if options.level >= slog.LevelError {
+	case options.level >= slog.LevelError:
 		out = os.Stderr
-	} else {
+	default:
 		out = os.Stdout
 	}
 
 	handler := defaultHandlerCreator(out, options)
 	s := slog.New(handler)
 
-	entry := logEntryPool.Get().(*LogEntry)
+	v := logEntryPool.Get()
+	entry, ok := v.(*LogEntry)
+	if !ok {
+		// Pool returned unexpected type, create new
+		entry = &LogEntry{}
+	}
 	entry.ctx = ctx
 	entry.log = s
 	entry.stackTraces = options.showStackTrace
@@ -95,7 +103,12 @@ func (e *LogEntry) Release() {
 
 // clone copies a LogEntry efficiently.
 func (e *LogEntry) clone() *LogEntry {
-	n := logEntryPool.Get().(*LogEntry)
+	v := logEntryPool.Get()
+	n, ok := v.(*LogEntry)
+	if !ok {
+		// Pool returned unexpected type, create new
+		n = &LogEntry{}
+	}
 	n.ctx = e.ctx
 	n.log = e.log
 	n.stackTraces = e.stackTraces
@@ -120,7 +133,7 @@ func (e *LogEntry) WithFields(fields map[string]any) *LogEntry {
 	if len(fields) == 0 {
 		return e
 	}
-	args := make([]any, 0, len(fields)*2)
+	args := make([]any, 0, len(fields)*fieldsSliceMultiplier)
 	for k, v := range fields {
 		args = append(args, k, v)
 	}
