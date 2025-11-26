@@ -15,293 +15,216 @@ import (
 	"github.com/lmittmann/tint"
 )
 
-// contextKeyType is used as a type-safe key for context values.
 type contextKeyType string
 
-// ctxValueLogger is the key to extract the LogEntry.
 const ctxValueLogger contextKeyType = "logger"
 
 const (
-	CallerDepth  = 3
-	FileLineAttr = 4
+	CallerDepth  = 2
+	FileLineAttr = "caller"
 )
 
-// ContextWithLogger pushes a LogEntry instance into the supplied context for easier propagation.
+// ContextWithLogger associates a logger with the context.
 func ContextWithLogger(ctx context.Context, logger *LogEntry) context.Context {
 	return context.WithValue(ctx, ctxValueLogger, logger)
 }
 
-// Log obtains a service instance being propagated through the context.
+// Log extracts the logger from context or creates a new one.
 func Log(ctx context.Context) *LogEntry {
-	v := ctx.Value(ctxValueLogger)
-	if v != nil {
-		if logger, ok := v.(*LogEntry); ok {
-			return logger
+	if v := ctx.Value(ctxValueLogger); v != nil {
+		if l, ok := v.(*LogEntry); ok {
+			return l
 		}
 	}
-
 	return NewLogger(ctx)
 }
 
-// SLog obtains an slog interface from the log entry in the context.
+// SLog exposes slog.Logger via context.
 func SLog(ctx context.Context) *slog.Logger {
-	return Log(ctx).SLog()
+	return Log(ctx).log
 }
 
-// LogEntry handles logging functionality with immutable chained calls.
+// LogEntry is a lightweight wrapper with optional stack traces.
 type LogEntry struct {
 	ctx         context.Context
 	log         *slog.Logger
 	stackTraces bool
 }
 
-//nolint:gochecknoglobals // Pool is necessarily global
 var logEntryPool = sync.Pool{
-	New: func() interface{} {
-		return &LogEntry{}
-	},
+	New: func() interface{} { return new(LogEntry) },
 }
 
-// NewLogger creates a new instance of LogEntry with the provided context and options.
+// NewLogger constructs a logger. No global side effects.
 func NewLogger(ctx context.Context, opts ...Option) *LogEntry {
-	// Start with default options and apply provided options
 	options := defaultLogOptions()
 	for _, opt := range opts {
 		opt(options)
 	}
 
-	// Determine output writer
-	var outputWriter io.Writer
-
+	var out io.Writer
 	if options.output != nil {
-		outputWriter = options.output
+		out = options.output
+	} else if options.level >= slog.LevelError {
+		out = os.Stderr
 	} else {
-		if options.level >= slog.LevelError {
-			outputWriter = os.Stderr
-		} else {
-			outputWriter = os.Stdout
-		}
+		out = os.Stdout
 	}
 
-	// Create handler - use the specified handler or create one using the handler creator.
-	handler := defaultHandlerCreator(outputWriter, options)
+	handler := defaultHandlerCreator(out, options)
+	s := slog.New(handler)
 
-	// Create logger
-	log := slog.New(handler)
-	slog.SetDefault(log)
-
-	// Get a LogEntry from the pool
-	entry, ok := logEntryPool.Get().(*LogEntry)
-	if !ok {
-		// Fallback in case of type assertion failure
-		entry = &LogEntry{}
-	}
-
+	entry := logEntryPool.Get().(*LogEntry)
 	entry.ctx = ctx
-	entry.log = log
+	entry.log = s
 	entry.stackTraces = options.showStackTrace
 
 	return entry
 }
 
-// Release returns the LogEntry to the pool for reuse.
-// Call this when you're done with a LogEntry and won't use it again.
+// Release returns the entry to the pool.
 func (e *LogEntry) Release() {
 	if e == nil {
 		return
 	}
-
-	// Reset fields to avoid leaking data
 	e.ctx = nil
 	e.log = nil
 	e.stackTraces = false
-
 	logEntryPool.Put(e)
 }
 
-// clone creates a new LogEntry with the same properties as the original.
+// clone copies a LogEntry efficiently.
 func (e *LogEntry) clone() *LogEntry {
-	if e == nil {
-		return NewLogger(context.Background())
-	}
-
-	// Get a new entry from the pool
-	clone, ok := logEntryPool.Get().(*LogEntry)
-	if !ok {
-		// Fallback in case of type assertion failure
-		clone = &LogEntry{}
-	}
-
-	// Copy all fields
-	clone.ctx = e.ctx
-	clone.log = e.log
-	clone.stackTraces = e.stackTraces
-
-	return clone
+	n := logEntryPool.Get().(*LogEntry)
+	n.ctx = e.ctx
+	n.log = e.log
+	n.stackTraces = e.stackTraces
+	return n
 }
 
-// WithContext returns a new LogEntry with the given context.
 func (e *LogEntry) WithContext(ctx context.Context) *LogEntry {
-	clone := e.clone()
-	clone.ctx = ctx
-	return clone
+	n := e.clone()
+	n.ctx = ctx
+	return n
 }
 
-// WithError returns a new LogEntry with the error added.
 func (e *LogEntry) WithError(err error) *LogEntry {
 	return e.With(tint.Err(err))
 }
 
-// WithField returns a new LogEntry with the field added.
 func (e *LogEntry) WithField(key string, value any) *LogEntry {
 	return e.With(slog.Any(key, value))
 }
 
-// WithFields returns a new LogEntry with the supplied fields added.
 func (e *LogEntry) WithFields(fields map[string]any) *LogEntry {
-	var data []any
-	for k, v := range fields {
-		data = append(data, k, v)
+	if len(fields) == 0 {
+		return e
 	}
-	return e.With(data...)
+	args := make([]any, 0, len(fields)*2)
+	for k, v := range fields {
+		args = append(args, k, v)
+	}
+	return e.With(args...)
 }
 
-// With returns a new LogEntry with the provided attributes added.
 func (e *LogEntry) With(args ...any) *LogEntry {
-	// No args, return the same logger
 	if len(args) == 0 {
 		return e
 	}
-
-	clone := e.clone()
-	clone.log = clone.log.With(args...)
-	return clone
+	n := e.clone()
+	n.log = e.log.With(args...)
+	return n
 }
 
-// _ctx returns the context or background if nil.
-func (e *LogEntry) _ctx() context.Context {
-	if e.ctx == nil {
-		return context.Background()
+func (e *LogEntry) ctxOrBackground() context.Context {
+	if e.ctx != nil {
+		return e.ctx
 	}
-	return e.ctx
+	return context.Background()
 }
 
-// Log logs a message at the given level.
 func (e *LogEntry) Log(ctx context.Context, level slog.Level, msg string, fields ...any) {
 	e.log.Log(ctx, level, msg, fields...)
 }
 
-// Logf logs a formatted message at the given level.
 func (e *LogEntry) Logf(ctx context.Context, level slog.Level, format string, args ...interface{}) {
-	if e.Enabled(ctx, level) {
+	if e.log.Enabled(ctx, level) {
 		e.log.Log(ctx, level, fmt.Sprintf(format, args...))
 	}
 }
 
-// Trace logs a message at debug level (alias for backward compatibility).
 func (e *LogEntry) Trace(msg string, args ...any) {
 	e.Debug(msg, args...)
 }
 
-// Debug logs a message at debug level.
 func (e *LogEntry) Debug(msg string, args ...any) {
-	log := e.withFileLineNum()
-	log.DebugContext(e._ctx(), msg, args...)
+	l := e.withCallerInfo()
+	l.DebugContext(e.ctxOrBackground(), msg, args...)
 }
 
-// Info logs a message at info level.
 func (e *LogEntry) Info(msg string, args ...any) {
-	e.log.InfoContext(e._ctx(), msg, args...)
+	e.log.InfoContext(e.ctxOrBackground(), msg, args...)
 }
 
-// Printf logs a formatted message at info level.
 func (e *LogEntry) Printf(format string, args ...any) {
-	e.Logf(e._ctx(), slog.LevelInfo, format, args...)
+	e.Logf(e.ctxOrBackground(), slog.LevelInfo, format, args...)
 }
 
-// Warn logs a message at warn level.
 func (e *LogEntry) Warn(msg string, args ...any) {
-	e.log.WarnContext(e._ctx(), msg, args...)
+	e.log.WarnContext(e.ctxOrBackground(), msg, args...)
 }
 
-// Error logs a message at error level.
 func (e *LogEntry) Error(msg string, args ...any) {
-	log := e.withFileLineNum()
+	l := e.withCallerInfo()
+	ctx := e.ctxOrBackground()
 
 	if e.stackTraces {
-		log.ErrorContext(e._ctx(), fmt.Sprintf(" %s\n%s\n", msg, debug.Stack()), args...)
+		stack := string(debug.Stack())
+		msg = fmt.Sprintf("%s\n%s", msg, stack)
 	}
 
-	log.ErrorContext(e._ctx(), msg, args...)
+	l.ErrorContext(ctx, msg, args...)
 }
 
-// Fatal logs a message at error level and exits with code 1.
 func (e *LogEntry) Fatal(msg string, args ...any) {
-	log := e.withFileLineNum()
+	l := e.withCallerInfo()
+	ctx := e.ctxOrBackground()
 
 	if e.stackTraces {
-		log.ErrorContext(e._ctx(), fmt.Sprintf("%s\n%s", msg, debug.Stack()), args...)
-	} else {
-		log.ErrorContext(e._ctx(), msg, args...)
+		msg = fmt.Sprintf("%s\n%s", msg, debug.Stack())
 	}
 
-	// Release the LogEntry back to the pool before exiting
+	l.ErrorContext(ctx, msg, args...)
 	e.Release()
-	e.Exit(1)
+	os.Exit(1)
 }
 
-// Panic logs a message at error level and panics.
 func (e *LogEntry) Panic(msg string, args ...any) {
-	log := e.withFileLineNum()
+	l := e.withCallerInfo()
+	ctx := e.ctxOrBackground()
 
-	var panicMsg string
 	if e.stackTraces {
-		formattedMsg := fmt.Sprintf("%s\n%s", msg, debug.Stack())
-		log.ErrorContext(e._ctx(), formattedMsg, args...)
-		panicMsg = formattedMsg
-	} else {
-		log.ErrorContext(e._ctx(), msg, args...)
-		panicMsg = msg
+		msg = fmt.Sprintf("%s\n%s", msg, debug.Stack())
 	}
 
-	// Format the panic message with args if provided
-	if len(args) > 0 {
-		panicMsg = fmt.Sprintf(panicMsg+" %v", args)
-	}
-
-	panic(panicMsg)
+	l.ErrorContext(ctx, msg, args...)
+	panic(fmt.Sprintf(msg, args...))
 }
 
-// Exit terminates the application with the given code.
-func (e *LogEntry) Exit(code int) {
-	os.Exit(code)
-}
-
-// Enabled returns whether the logger will log at the given level.
 func (e *LogEntry) Enabled(ctx context.Context, level slog.Level) bool {
 	return e.log.Enabled(ctx, level)
 }
 
-// LevelEnabled is an alias for Enabled for backward compatibility.
-func (e *LogEntry) LevelEnabled(ctx context.Context, level slog.Level) bool {
-	return e.Enabled(ctx, level)
-}
+func (e *LogEntry) SLog() *slog.Logger { return e.log }
 
-// SLog returns the underlying slog.Logger.
-func (e *LogEntry) SLog() *slog.Logger {
-	return e.log
-}
-
-// withFileLineNum adds file and line information to the log entry.
-func (e *LogEntry) withFileLineNum() *slog.Logger {
-	_, file, line, ok := runtime.Caller(CallerDepth)
-	if ok {
-		return e.log.With(tint.Attr(FileLineAttr, slog.Any("file", fmt.Sprintf("%s:%d", file, line))))
+func (e *LogEntry) withCallerInfo() *slog.Logger {
+	if _, file, line, ok := runtime.Caller(CallerDepth); ok {
+		return e.log.With(slog.String(FileLineAttr, fmt.Sprintf("%s:%d", file, line)))
 	}
 	return e.log
 }
 
-// MultiHandler writes logs to multiple slog handlers (e.g. console + OTel).
+// MultiHandler fans out records to multiple handlers.
 type MultiHandler struct {
 	handlers []slog.Handler
 }
@@ -311,20 +234,17 @@ func (m *MultiHandler) extendHandler(h ...slog.Handler) {
 }
 
 func (m *MultiHandler) Enabled(ctx context.Context, level slog.Level) bool {
-	var enabled bool
 	for _, h := range m.handlers {
 		if h.Enabled(ctx, level) {
-			enabled = true
+			return true
 		}
 	}
-	return enabled
+	return false
 }
 
 func (m *MultiHandler) Handle(ctx context.Context, r slog.Record) error {
-	var err error
 	for _, h := range m.handlers {
-		err = h.Handle(ctx, r)
-		if err != nil {
+		if err := h.Handle(ctx, r); err != nil {
 			return err
 		}
 	}
@@ -332,17 +252,17 @@ func (m *MultiHandler) Handle(ctx context.Context, r slog.Record) error {
 }
 
 func (m *MultiHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	hs := make([]slog.Handler, len(m.handlers))
+	n := make([]slog.Handler, len(m.handlers))
 	for i, h := range m.handlers {
-		hs[i] = h.WithAttrs(attrs)
+		n[i] = h.WithAttrs(attrs)
 	}
-	return &MultiHandler{hs}
+	return &MultiHandler{handlers: n}
 }
 
 func (m *MultiHandler) WithGroup(name string) slog.Handler {
-	hs := make([]slog.Handler, len(m.handlers))
+	n := make([]slog.Handler, len(m.handlers))
 	for i, h := range m.handlers {
-		hs[i] = h.WithGroup(name)
+		n[i] = h.WithGroup(name)
 	}
-	return &MultiHandler{hs}
+	return &MultiHandler{handlers: n}
 }
