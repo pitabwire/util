@@ -15,9 +15,10 @@ import (
 	"github.com/lmittmann/tint"
 )
 
+// contextKeyType is a type alias for string to namespace Context keys per-package.
 type contextKeyType string
 
-const ctxValueLogger contextKeyType = "logger"
+const ctxValueLogger = contextKeyType("logger")
 
 const (
 	CallerDepth  = 2

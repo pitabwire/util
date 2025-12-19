@@ -6,11 +6,8 @@ import (
 	"context"
 )
 
-// contextKeys is a type alias for string to namespace Context keys per-package.
-type contextKeys string
-
 // ctxValueRequestID is the key to extract the request ID for an HTTP request.
-const ctxValueRequestID = contextKeys("requestid")
+const ctxValueRequestID = contextKeyType("request_id")
 
 func ContextWithRequestID(ctx context.Context, requestID string) context.Context {
 	return context.WithValue(ctx, ctxValueRequestID, requestID)
