@@ -9,12 +9,7 @@ const ctxValueTenancyData = contextKeyType("tenancy_info")
 type TenancyInfo interface {
 	GetTenantID() string
 	GetPartitionID() string
-	GetProfileID() string
 	GetAccessID() string
-	GetContactID() string
-	GetSessionID() string
-	GetDeviceID() string
-	GetRoles() []string
 }
 
 func SetTenancy(ctx context.Context, tenancyInfo TenancyInfo) context.Context {
