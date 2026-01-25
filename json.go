@@ -106,7 +106,7 @@ func Protect(handler http.HandlerFunc) http.HandlerFunc {
 // http.Requests will have a logger (with a request ID/method/path logged) attached to the Context.
 // This can be accessed via GetLogger(Context).
 func RequestWithLogging(req *http.Request) *http.Request {
-	reqID := RandomString(DefaultRequestIDLength)
+	reqID := RandomAlphaNumericString(DefaultRequestIDLength)
 	// Set a Logger and request ID on the context
 	ctx := ContextWithLogger(req.Context(), Log(req.Context()).
 		WithField("req.method", req.Method).
