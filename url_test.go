@@ -1,7 +1,9 @@
-package util
+package util_test
 
 import (
 	"testing"
+
+	"github.com/pitabwire/util"
 )
 
 func TestValidateHTTPURL(t *testing.T) {
@@ -19,7 +21,7 @@ func TestValidateHTTPURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			u, err := ValidateHTTPURL(tt.rawURL)
+			u, err := util.ValidateHTTPURL(tt.rawURL)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateHTTPURL(%q) error = %v, wantErr %v", tt.rawURL, err, tt.wantErr)
 				return

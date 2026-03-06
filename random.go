@@ -25,7 +25,7 @@ func RandomString(n int, charset string) string {
 	maxLen := big.NewInt(int64(len(charset)))
 	b := make([]byte, n)
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		idx, err := rand.Int(rand.Reader, maxLen)
 		if err != nil {
 			panic(err)

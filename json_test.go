@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/pitabwire/util"
@@ -64,7 +65,7 @@ func TestMakeJSONAPI(t *testing.T) {
 		if mockWriter.Code != tst.ExpectCode {
 			t.Errorf("TestMakeJSONAPI wanted HTTP status %d, got %d", tst.ExpectCode, mockWriter.Code)
 		}
-		actualBody := mockWriter.Body.String()
+		actualBody := strings.TrimSpace(mockWriter.Body.String())
 		if actualBody != tst.ExpectJSON {
 			t.Errorf("TestMakeJSONAPI wanted body '%s', got '%s'", tst.ExpectJSON, actualBody)
 		}
@@ -128,7 +129,7 @@ func TestMakeJSONAPIError(t *testing.T) {
 	if mockWriter.Code != 500 {
 		t.Errorf("TestMakeJSONAPIError wanted HTTP status 500, got %d", mockWriter.Code)
 	}
-	actualBody := mockWriter.Body.String()
+	actualBody := strings.TrimSpace(mockWriter.Body.String())
 	expect := `{"message":"oops"}`
 	if actualBody != expect {
 		t.Errorf("TestMakeJSONAPIError wanted body '%s', got '%s'", expect, actualBody)
@@ -197,7 +198,7 @@ func TestProtect(t *testing.T) {
 	}
 
 	expectBody := `{"message":"Internal Server Error"}`
-	actualBody := mockWriter.Body.String()
+	actualBody := strings.TrimSpace(mockWriter.Body.String())
 	if actualBody != expectBody {
 		t.Errorf("TestProtect wanted body %s, got %s", expectBody, actualBody)
 	}
@@ -218,7 +219,7 @@ func TestProtectWithoutLogger(t *testing.T) {
 	}
 
 	expectBody := `{"message":"Internal Server Error"}`
-	actualBody := mockWriter.Body.String()
+	actualBody := strings.TrimSpace(mockWriter.Body.String())
 	if actualBody != expectBody {
 		t.Errorf("TestProtect wanted body %s, got %s", expectBody, actualBody)
 	}

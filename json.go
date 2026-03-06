@@ -139,6 +139,7 @@ func MakeJSONAPI(handler JSONRequestHandler) http.HandlerFunc {
 
 		// Set common headers returned regardless of the outcome of the request
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
 		SetCORSHeaders(w)
 
 		respond(w, req, res)
@@ -148,51 +149,67 @@ func MakeJSONAPI(handler JSONRequestHandler) http.HandlerFunc {
 func respond(w http.ResponseWriter, req *http.Request, res JSONResponse) {
 	logger := Log(req.Context())
 
-	// Set custom headers
-	if res.Headers != nil {
-		for h, val := range res.Headers {
-			var headerValues []any
-
-			// Check if the value is already a headerValues
-			if reflect.TypeOf(val).Kind() == reflect.Slice {
-				v := reflect.ValueOf(val)
-				for i := range v.Len() {
-					headerValues = append(headerValues, v.Index(i).Interface())
-				}
-			} else {
-				// If not a headerValues, wrap it in a headerValues
-				headerValues = []any{val}
-			}
-
-			// Iterate over the headerValues and validate each element
-			for _, item := range headerValues {
-				switch v := item.(type) {
-				case string:
-					w.Header().Add(h, v)
-				case *http.Cookie:
-					http.SetCookie(w, v)
-				default:
-					w.Header().Add(h, fmt.Sprintf("%v", v))
-				}
-			}
-		}
-	}
-
-	// Marshal JSON response into raw bytes to send as the HTTP body
-	resBytes, err := json.Marshal(res.JSON)
-	if err != nil {
-		logger.WithError(err).Error("Failed to marshal JSONResponse")
-		// this should never fail to be marshalled so drop err to the floor
-		res = MessageResponse(StatusInternalServerError, "Internal Server Error")
-		resBytes, _ = json.Marshal(res.JSON)
-	}
+	setCustomHeaders(w, res.Headers)
 
 	// Set status code and write the body
 	w.WriteHeader(res.Code)
+	writeResponseJSON(w, logger, res)
 	if req.Method != http.MethodOptions {
-		logger.WithField("code", res.Code).WithField("bytes", len(resBytes)).Trace("Responding")
+		logger.WithField("code", res.Code).Trace("Responding")
 	}
-	_, _ = w.Write(resBytes)
+}
+
+func setCustomHeaders(w http.ResponseWriter, headers map[string]any) {
+	for headerName, rawValue := range headers {
+		headerValues := toHeaderValues(rawValue)
+		for _, item := range headerValues {
+			addHeaderValue(w, headerName, item)
+		}
+	}
+}
+
+func toHeaderValues(v any) []any {
+	t := reflect.TypeOf(v)
+	if t == nil || t.Kind() != reflect.Slice {
+		return []any{v}
+	}
+
+	values := reflect.ValueOf(v)
+	headerValues := make([]any, 0, values.Len())
+	for i := range values.Len() {
+		headerValues = append(headerValues, values.Index(i).Interface())
+	}
+	return headerValues
+}
+
+func addHeaderValue(w http.ResponseWriter, headerName string, v any) {
+	switch h := v.(type) {
+	case string:
+		w.Header().Add(headerName, h)
+	case *http.Cookie:
+		http.SetCookie(w, h)
+	default:
+		w.Header().Add(headerName, fmt.Sprintf("%v", h))
+	}
+}
+
+func writeResponseJSON(w http.ResponseWriter, logger *LogEntry, res JSONResponse) {
+	enc := json.NewEncoder(w)
+	enc.SetEscapeHTML(true)
+	err := enc.Encode(res.JSON)
+	if err == nil {
+		return
+	}
+
+	logger.WithError(err).Error("Failed to encode JSONResponse")
+	if res.Code != StatusInternalServerError {
+		return
+	}
+
+	fallback := MessageResponse(StatusInternalServerError, "Internal Server Error")
+	if fallbackErr := enc.Encode(fallback.JSON); fallbackErr != nil {
+		logger.WithError(fallbackErr).Error("Failed to encode fallback JSONResponse")
+	}
 }
 
 // WithCORSOptions intercepts all OPTIONS requests and responds with CORS headers. The request handler
