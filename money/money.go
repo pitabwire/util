@@ -100,3 +100,56 @@ func FromFloat64(currency string, amount float64) *money.Money {
 func ToCents(units int64, nanos int32) int64 {
 	return units*CentsPerUnit + int64(nanos/NanosPerCent)
 }
+
+// ---------------------------------------------------------------------------
+// Smallest-unit (Int64) conversions — for currencies where amounts are
+// tracked as indivisible integers in their smallest denomination.
+// Examples: ETH wei (decimals=18), BTC satoshi (decimals=8),
+// USD cents (decimals=2).
+// ---------------------------------------------------------------------------
+
+// ToSmallestUnit converts a google.type.Money to its smallest unit
+// representation given the number of decimal places for the currency.
+// For example, 1.5 ETH with decimals=18 returns 1500000000000000000 (wei).
+func ToSmallestUnit(m *money.Money, decimals int32) int64 {
+	d := FromMoney(m)
+	return d.ToMinorUnits(decimals)
+}
+
+// FromSmallestUnit converts a smallest-unit integer back to a
+// google.type.Money. For example, 1500000000000000000 wei with
+// decimals=18 and currency "ETH" returns Money{Units: 1, Nanos: 500000000}.
+func FromSmallestUnit(currency string, amount int64, decimals int32) *money.Money {
+	d := decimalx.FromMinorUnits(amount, decimals)
+	return ToMoney(currency, d)
+}
+
+// ToSmallestUnitDecimal converts a google.type.Money to a Decimal
+// representing the amount in the smallest unit. This avoids int64 overflow
+// for very large values (e.g. wei amounts exceeding MaxInt64).
+func ToSmallestUnitDecimal(m *money.Money, decimals int32) decimalx.Decimal {
+	d := FromMoney(m)
+	multiplier := decimalx.New(1, decimals)
+	return d.Mul(multiplier)
+}
+
+// FromSmallestUnitDecimal converts a Decimal in the smallest unit back to
+// a google.type.Money. Use this when the smallest-unit value may exceed
+// int64 range.
+func FromSmallestUnitDecimal(currency string, amount decimalx.Decimal, decimals int32) *money.Money {
+	divisor := decimalx.New(1, decimals)
+	d := amount.Div(divisor)
+	return ToMoney(currency, d)
+}
+
+// FromInt64 converts an int64 amount in the smallest unit to a
+// google.type.Money. Shorthand for FromSmallestUnit.
+func FromInt64(currency string, amount int64, decimals int32) *money.Money {
+	return FromSmallestUnit(currency, amount, decimals)
+}
+
+// ToInt64 converts a google.type.Money to an int64 in the smallest unit.
+// Shorthand for ToSmallestUnit.
+func ToInt64(m *money.Money, decimals int32) int64 {
+	return ToSmallestUnit(m, decimals)
+}

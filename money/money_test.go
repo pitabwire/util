@@ -128,3 +128,64 @@ func TestToCents(t *testing.T) {
 		})
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Smallest-unit / Int64 conversions
+// ---------------------------------------------------------------------------
+
+func TestSmallestUnitRoundTrip_Cents(t *testing.T) {
+	// 10.50 USD -> 1050 cents -> back to 10.50 USD
+	m := &money.Money{CurrencyCode: "USD", Units: 10, Nanos: 500000000}
+	cents := ToSmallestUnit(m, 2)
+	if cents != 1050 {
+		t.Errorf("ToSmallestUnit(10.50 USD, 2) = %d, want 1050", cents)
+	}
+	back := FromSmallestUnit("USD", cents, 2)
+	if back.Units != 10 || back.Nanos != 500000000 {
+		t.Errorf("FromSmallestUnit(1050, 2) = {%d, %d}, want {10, 500000000}", back.Units, back.Nanos)
+	}
+}
+
+func TestSmallestUnitRoundTrip_Satoshi(t *testing.T) {
+	// 1.5 BTC -> 150000000 satoshi -> back
+	m := &money.Money{CurrencyCode: "BTC", Units: 1, Nanos: 500000000}
+	sats := ToSmallestUnit(m, 8)
+	if sats != 150000000 {
+		t.Errorf("ToSmallestUnit(1.5 BTC, 8) = %d, want 150000000", sats)
+	}
+	back := FromSmallestUnit("BTC", sats, 8)
+	if back.Units != 1 || back.Nanos != 500000000 {
+		t.Errorf("FromSmallestUnit(150000000, 8) = {%d, %d}, want {1, 500000000}", back.Units, back.Nanos)
+	}
+}
+
+func TestSmallestUnitDecimal_Wei(t *testing.T) {
+	// 1.5 ETH in wei = 1500000000000000000
+	m := &money.Money{CurrencyCode: "ETH", Units: 1, Nanos: 500000000}
+	wei := ToSmallestUnitDecimal(m, 18)
+	want, _ := decimalx.NewFromString("1500000000000000000")
+	if !wei.Equal(want) {
+		t.Errorf("ToSmallestUnitDecimal(1.5 ETH, 18) = %s, want 1500000000000000000", wei)
+	}
+
+	// Round-trip back
+	back := FromSmallestUnitDecimal("ETH", wei, 18)
+	if back.Units != 1 || back.Nanos != 500000000 {
+		t.Errorf("FromSmallestUnitDecimal round-trip: {%d, %d}, want {1, 500000000}", back.Units, back.Nanos)
+	}
+}
+
+func TestFromInt64_Alias(t *testing.T) {
+	m := FromInt64("KES", 15050, 2)
+	if m.Units != 150 || m.Nanos != 500000000 {
+		t.Errorf("FromInt64(KES, 15050, 2) = {%d, %d}, want {150, 500000000}", m.Units, m.Nanos)
+	}
+}
+
+func TestToInt64_Alias(t *testing.T) {
+	m := &money.Money{CurrencyCode: "KES", Units: 150, Nanos: 500000000}
+	got := ToInt64(m, 2)
+	if got != 15050 {
+		t.Errorf("ToInt64(150.50 KES, 2) = %d, want 15050", got)
+	}
+}
