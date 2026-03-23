@@ -279,3 +279,94 @@ func TestNewFromStringInvalid(t *testing.T) {
 		t.Error("expected error for invalid string")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Abs, Min, Max, comparison helpers
+// ---------------------------------------------------------------------------
+
+func TestAbs(t *testing.T) {
+	neg := NewFromInt64(-42)
+	if !neg.Abs().Equal(NewFromInt64(42)) {
+		t.Errorf("Abs(-42) = %s, want 42", neg.Abs())
+	}
+	pos := NewFromInt64(7)
+	if !pos.Abs().Equal(NewFromInt64(7)) {
+		t.Errorf("Abs(7) = %s, want 7", pos.Abs())
+	}
+	z := Zero()
+	if !z.Abs().IsZero() {
+		t.Errorf("Abs(0) = %s, want 0", z.Abs())
+	}
+}
+
+func TestMin(t *testing.T) {
+	a := NewFromInt64(3)
+	b := NewFromInt64(7)
+	if !Min(a, b).Equal(a) {
+		t.Errorf("Min(3, 7) = %s, want 3", Min(a, b))
+	}
+	if !Min(b, a).Equal(a) {
+		t.Errorf("Min(7, 3) = %s, want 3", Min(b, a))
+	}
+}
+
+func TestMax(t *testing.T) {
+	a := NewFromInt64(3)
+	b := NewFromInt64(7)
+	if !Max(a, b).Equal(b) {
+		t.Errorf("Max(3, 7) = %s, want 7", Max(a, b))
+	}
+}
+
+func TestLessThanOrEqual(t *testing.T) {
+	a := NewFromInt64(5)
+	b := NewFromInt64(5)
+	c := NewFromInt64(6)
+	if !a.LessThanOrEqual(b) {
+		t.Error("5 <= 5 should be true")
+	}
+	if !a.LessThanOrEqual(c) {
+		t.Error("5 <= 6 should be true")
+	}
+	if c.LessThanOrEqual(a) {
+		t.Error("6 <= 5 should be false")
+	}
+}
+
+func TestGreaterThanOrEqual(t *testing.T) {
+	a := NewFromInt64(5)
+	b := NewFromInt64(5)
+	c := NewFromInt64(3)
+	if !a.GreaterThanOrEqual(b) {
+		t.Error("5 >= 5 should be true")
+	}
+	if !a.GreaterThanOrEqual(c) {
+		t.Error("5 >= 3 should be true")
+	}
+	if c.GreaterThanOrEqual(a) {
+		t.Error("3 >= 5 should be false")
+	}
+}
+
+func TestPtr(t *testing.T) {
+	d := NewFromInt64(42)
+	p := d.Ptr()
+	if p == nil {
+		t.Fatal("Ptr() returned nil")
+	}
+	if !p.Equal(d) {
+		t.Errorf("Ptr() = %s, want 42", p)
+	}
+}
+
+func TestDerefOr(t *testing.T) {
+	d := NewFromInt64(99)
+	got := DerefOr(&d, Zero())
+	if !got.Equal(d) {
+		t.Errorf("DerefOr(&99, 0) = %s, want 99", got)
+	}
+	got2 := DerefOr(nil, NewFromInt64(7))
+	if !got2.Equal(NewFromInt64(7)) {
+		t.Errorf("DerefOr(nil, 7) = %s, want 7", got2)
+	}
+}

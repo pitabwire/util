@@ -170,6 +170,57 @@ func (v Decimal) GreaterThan(other Decimal) bool {
 }
 
 // ---------------------------------------------------------------------------
+// Comparison helpers
+// ---------------------------------------------------------------------------
+
+// LessThanOrEqual returns true when v <= other.
+func (v Decimal) LessThanOrEqual(other Decimal) bool {
+	return v.inner().Cmp(other.inner()) <= 0
+}
+
+// GreaterThanOrEqual returns true when v >= other.
+func (v Decimal) GreaterThanOrEqual(other Decimal) bool {
+	return v.inner().Cmp(other.inner()) >= 0
+}
+
+// Abs returns the absolute value of v.
+func (v Decimal) Abs() Decimal {
+	if v.IsNegative() {
+		return v.Neg()
+	}
+	return v
+}
+
+// Min returns the smaller of v and other.
+func Min(a, b Decimal) Decimal {
+	if a.LessThan(b) {
+		return a
+	}
+	return b
+}
+
+// Max returns the larger of v and other.
+func Max(a, b Decimal) Decimal {
+	if a.GreaterThan(b) {
+		return a
+	}
+	return b
+}
+
+// Ptr returns a pointer to the Decimal value. Useful for nullable fields.
+func (v Decimal) Ptr() *Decimal {
+	return &v
+}
+
+// DerefOr dereferences p, returning def if p is nil.
+func DerefOr(p *Decimal, def Decimal) Decimal {
+	if p == nil {
+		return def
+	}
+	return *p
+}
+
+// ---------------------------------------------------------------------------
 // Conversion
 // ---------------------------------------------------------------------------
 
