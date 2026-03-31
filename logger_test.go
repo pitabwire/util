@@ -135,6 +135,8 @@ func TestMultiHandlerVerification(t *testing.T) {
 	t.Run("HandlerExclusiveMode", testHandlerExclusiveMode)
 	t.Run("DefaultMultiHandlerBehavior", testDefaultMultiHandlerBehavior)
 	t.Run("MultipleHandlersViaMultipleLoggers", testMultipleHandlersViaMultipleLoggers)
+	t.Run("JSONFormatOutput", testJSONFormatOutput)
+	t.Run("HandlerWrapper", testHandlerWrapper)
 }
 
 func testIndividualHandlerUsage(t *testing.T) {
@@ -232,6 +234,46 @@ func testDefaultMultiHandlerBehavior(t *testing.T) {
 	// Should contain JSON from custom handler
 	if !strings.Contains(output, `"msg":"default multi message"`) {
 		t.Error("Custom handler in default MultiHandler did not work")
+	}
+}
+
+func testJSONFormatOutput(t *testing.T) {
+	ctx := t.Context()
+	var buf bytes.Buffer
+
+	logger := util.NewLogger(ctx, util.WithLogFormat("json"), util.WithLogOutput(&buf))
+	defer logger.Release()
+
+	logger.WithField("user_id", "u123").Info("login completed")
+
+	output := buf.String()
+	if !strings.Contains(output, `"msg":"login completed"`) {
+		t.Errorf("JSON format did not produce expected msg field, got: %s", output)
+	}
+	if !strings.Contains(output, `"user_id":"u123"`) {
+		t.Errorf("JSON format did not include structured field, got: %s", output)
+	}
+}
+
+func testHandlerWrapper(t *testing.T) {
+	ctx := t.Context()
+	var buf bytes.Buffer
+
+	wrapper := func(h slog.Handler) slog.Handler {
+		return h.WithAttrs([]slog.Attr{slog.String("injected", "trace123")})
+	}
+
+	logger := util.NewLogger(ctx,
+		util.WithLogFormat("json"),
+		util.WithLogOutput(&buf),
+		util.WithLogHandlerWrapper(wrapper))
+	defer logger.Release()
+
+	logger.Info("test message")
+
+	output := buf.String()
+	if !strings.Contains(output, `"injected":"trace123"`) {
+		t.Errorf("Handler wrapper did not inject attribute, got: %s", output)
 	}
 }
 

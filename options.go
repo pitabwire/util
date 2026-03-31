@@ -28,6 +28,9 @@ type logOptions struct {
 	// showStackTrace enables automatic stack trace printing for Error and Fatal logs
 	showStackTrace bool
 
+	// format selects the output format: "text" (tint colored) or "json" (structured JSON)
+	format string
+
 	// output specifies the destination for log output (defaults to os.Stdout or os.Stderr based on level)
 	output io.Writer
 
@@ -36,6 +39,10 @@ type logOptions struct {
 
 	// handlerExclusive enforces that only the set handler is utilized
 	handlerExclusive bool
+
+	// handlerWrapper wraps the stdout handler (tint or JSON) before it is added to the MultiHandler.
+	// Use this to inject middleware such as trace context injection without adding dependencies to util.
+	handlerWrapper func(slog.Handler) slog.Handler
 }
 
 // Option is a function that configures logOptions.
@@ -49,11 +56,14 @@ func defaultLogOptions() *logOptions {
 		timeFormat:       time.DateTime,
 		noColor:          false,
 		showStackTrace:   false,
+		format:           "text",
 		handlerExclusive: false,
 	}
 }
 
-// defaultHandlerCreator creates the default tint-based colored slog.Handler.
+// defaultHandlerCreator creates the stdout slog.Handler based on format configuration.
+// When format is "json", it uses slog.NewJSONHandler for machine-parseable output.
+// Otherwise, it uses the tint handler for human-readable colored output.
 func defaultHandlerCreator(writer io.Writer, opts *logOptions) slog.Handler {
 	if opts == nil {
 		opts = defaultLogOptions()
@@ -65,14 +75,24 @@ func defaultHandlerCreator(writer io.Writer, opts *logOptions) slog.Handler {
 		}
 	}
 
-	handlerOptions := &tint.Options{
-		AddSource:  opts.addSource,
-		Level:      opts.level,
-		TimeFormat: opts.timeFormat,
-		NoColor:    opts.noColor,
+	var stdHandler slog.Handler
+	if opts.format == "json" {
+		stdHandler = slog.NewJSONHandler(writer, &slog.HandlerOptions{
+			AddSource: opts.addSource,
+			Level:     opts.level,
+		})
+	} else {
+		stdHandler = tint.NewHandler(writer, &tint.Options{
+			AddSource:  opts.addSource,
+			Level:      opts.level,
+			TimeFormat: opts.timeFormat,
+			NoColor:    opts.noColor,
+		})
 	}
 
-	stdHandler := tint.NewHandler(writer, handlerOptions)
+	if opts.handlerWrapper != nil {
+		stdHandler = opts.handlerWrapper(stdHandler)
+	}
 
 	multiHandler := &MultiHandler{handlers: []slog.Handler{stdHandler}}
 
@@ -136,6 +156,25 @@ func WithLogHandler(handler slog.Handler) Option {
 func WithLogHandlerExclusive() Option {
 	return func(o *logOptions) {
 		o.handlerExclusive = true
+	}
+}
+
+// WithLogFormat sets the output format. Supported values: "text" (default, tint colored)
+// and "json" (structured JSON via slog.JSONHandler for production use).
+func WithLogFormat(format string) Option {
+	return func(o *logOptions) {
+		if format == "json" || format == "text" {
+			o.format = format
+		}
+	}
+}
+
+// WithLogHandlerWrapper sets a function that wraps the stdout handler (tint or JSON)
+// before it is added to the MultiHandler. This allows injecting handler middleware
+// (e.g., trace context injection) without adding dependencies to this package.
+func WithLogHandlerWrapper(wrapper func(slog.Handler) slog.Handler) Option {
+	return func(o *logOptions) {
+		o.handlerWrapper = wrapper
 	}
 }
 
