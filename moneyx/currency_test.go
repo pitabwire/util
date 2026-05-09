@@ -1,11 +1,11 @@
-package money
+package moneyx
 
 import (
 	"errors"
 	"strconv"
 	"testing"
 
-	"google.golang.org/genproto/googleapis/type/money"
+	commonv1 "buf.build/gen/go/antinvestor/common/protocolbuffers/go/common/v1"
 )
 
 func TestDecimals(t *testing.T) {
@@ -37,7 +37,7 @@ func TestDecimals(t *testing.T) {
 }
 
 func TestToSmallestUnitStrict_Success(t *testing.T) {
-	m := &money.Money{CurrencyCode: "USD", Units: 12, Nanos: 340_000_000}
+	m := &commonv1.Money{CurrencyCode: "USD", Units: 12, Nanos: 340_000_000}
 	got, err := ToSmallestUnitStrict(m, "USD", 2)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -48,7 +48,7 @@ func TestToSmallestUnitStrict_Success(t *testing.T) {
 }
 
 func TestToSmallestUnitStrict_CaseInsensitiveCurrency(t *testing.T) {
-	m := &money.Money{CurrencyCode: "usd", Units: 1, Nanos: 0}
+	m := &commonv1.Money{CurrencyCode: "usd", Units: 1, Nanos: 0}
 	got, err := ToSmallestUnitStrict(m, "USD", 2)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -59,7 +59,7 @@ func TestToSmallestUnitStrict_CaseInsensitiveCurrency(t *testing.T) {
 }
 
 func TestToSmallestUnitStrict_CurrencyMismatch(t *testing.T) {
-	m := &money.Money{CurrencyCode: "USD", Units: 1}
+	m := &commonv1.Money{CurrencyCode: "USD", Units: 1}
 	_, err := ToSmallestUnitStrict(m, "KES", 2)
 	if err == nil {
 		t.Fatal("expected error, got nil")
@@ -79,10 +79,10 @@ func TestToSmallestUnitStrict_NilMoney(t *testing.T) {
 func TestToSmallestUnitStrict_SignMismatch(t *testing.T) {
 	tests := []struct {
 		name string
-		m    *money.Money
+		m    *commonv1.Money
 	}{
-		{"positive units, negative nanos", &money.Money{CurrencyCode: "USD", Units: 1, Nanos: -100}},
-		{"negative units, positive nanos", &money.Money{CurrencyCode: "USD", Units: -1, Nanos: 100}},
+		{"positive units, negative nanos", &commonv1.Money{CurrencyCode: "USD", Units: 1, Nanos: -100}},
+		{"negative units, positive nanos", &commonv1.Money{CurrencyCode: "USD", Units: -1, Nanos: 100}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -97,15 +97,15 @@ func TestToSmallestUnitStrict_SignMismatch(t *testing.T) {
 func TestToMinorUnitsByCurrency(t *testing.T) {
 	tests := []struct {
 		name             string
-		m                *money.Money
+		m                *commonv1.Money
 		expectedCurrency string
 		want             int64
 		wantErr          bool
 	}{
-		{"USD 12.34", &money.Money{CurrencyCode: "USD", Units: 12, Nanos: 340_000_000}, "USD", 1234, false},
-		{"JPY 500 (zero decimals)", &money.Money{CurrencyCode: "JPY", Units: 500, Nanos: 0}, "JPY", 500, false},
-		{"KWD 1.234 (three decimals)", &money.Money{CurrencyCode: "KWD", Units: 1, Nanos: 234_000_000}, "KWD", 1234, false},
-		{"USD vs KES mismatch", &money.Money{CurrencyCode: "USD", Units: 1}, "KES", 0, true},
+		{"USD 12.34", &commonv1.Money{CurrencyCode: "USD", Units: 12, Nanos: 340_000_000}, "USD", 1234, false},
+		{"JPY 500 (zero decimals)", &commonv1.Money{CurrencyCode: "JPY", Units: 500, Nanos: 0}, "JPY", 500, false},
+		{"KWD 1.234 (three decimals)", &commonv1.Money{CurrencyCode: "KWD", Units: 1, Nanos: 234_000_000}, "KWD", 1234, false},
+		{"USD vs KES mismatch", &commonv1.Money{CurrencyCode: "USD", Units: 1}, "KES", 0, true},
 		{"nil money", nil, "USD", 0, true},
 	}
 	for _, tc := range tests {

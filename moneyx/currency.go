@@ -1,16 +1,16 @@
 // Package money — ISO 4217 currency precision lookup and strict
-// conversion helpers. The conversions in money.go take an explicit
+// conversion helpers. The conversions in moneyx.go take an explicit
 // `decimals` parameter; in many callers the decimals are determined
 // solely by the currency code, and a strict check that the wire money
 // matches an expected currency avoids silent currency coercion bugs.
-package money
+package moneyx
 
 import (
 	"errors"
 	"fmt"
 	"strings"
 
-	"google.golang.org/genproto/googleapis/type/money"
+	commonv1 "buf.build/gen/go/antinvestor/common/protocolbuffers/go/common/v1"
 )
 
 // ─── ISO 4217 precision lookup ──────────────────────────────────────
@@ -45,25 +45,25 @@ func Decimals(currencyCode string) int32 {
 
 // ─── Strict converters ──────────────────────────────────────────────
 
-// ErrCurrencyMismatch is returned when a *money.Money's currency code
+// ErrCurrencyMismatch is returned when a *commonv1.Money's currency code
 // does not match the expected currency. Callers should never silently
 // coerce money between currencies; converting an off-currency amount
 // without explicit FX is a correctness bug.
 var ErrCurrencyMismatch = errors.New("money: currency mismatch")
 
-// ErrSignMismatch is returned when a *money.Money has units and nanos
+// ErrSignMismatch is returned when a *commonv1.Money has units and nanos
 // with opposite signs, which is invalid per google.type.Money semantics.
 var ErrSignMismatch = errors.New("money: units and nanos have opposite signs")
 
-// ErrNilMoney is returned when a nil *money.Money is passed to a strict
+// ErrNilMoney is returned when a nil *commonv1.Money is passed to a strict
 // converter that requires a non-nil input.
 var ErrNilMoney = errors.New("money: nil input")
 
-// ToSmallestUnitStrict converts a *money.Money to int64 minor units,
+// ToSmallestUnitStrict converts a *commonv1.Money to int64 minor units,
 // validating that the currency matches expectedCurrency (case-insensitive)
 // and that the units/nanos signs agree. It is the strict variant of
 // ToSmallestUnit for callers that need to refuse silent coercion.
-func ToSmallestUnitStrict(m *money.Money, expectedCurrency string, decimals int32) (int64, error) {
+func ToSmallestUnitStrict(m *commonv1.Money, expectedCurrency string, decimals int32) (int64, error) {
 	if m == nil {
 		return 0, ErrNilMoney
 	}
@@ -81,15 +81,15 @@ func ToSmallestUnitStrict(m *money.Money, expectedCurrency string, decimals int3
 // it looks up the ISO 4217 precision for expectedCurrency, validates currency
 // match, and converts. Use it when the caller wants currency-aware precision
 // without juggling the decimals argument.
-func ToMinorUnitsByCurrency(m *money.Money, expectedCurrency string) (int64, error) {
+func ToMinorUnitsByCurrency(m *commonv1.Money, expectedCurrency string) (int64, error) {
 	return ToSmallestUnitStrict(m, expectedCurrency, Decimals(expectedCurrency))
 }
 
 // FromMinorUnitsByCurrency converts an int64 minor-unit amount and a
-// currency code to a *money.Money, looking up the ISO 4217 precision
+// currency code to a *commonv1.Money, looking up the ISO 4217 precision
 // for the code. The returned message has the supplied currency stamped
 // on it; if the currency is unknown the conversion uses 2 decimals (the
 // Decimals fallback).
-func FromMinorUnitsByCurrency(currency string, minor int64) *money.Money {
+func FromMinorUnitsByCurrency(currency string, minor int64) *commonv1.Money {
 	return FromSmallestUnit(currency, minor, Decimals(currency))
 }

@@ -1,10 +1,10 @@
-package money
+package moneyx
 
 import (
 	"testing"
 
 	"github.com/pitabwire/util/decimalx"
-	"google.golang.org/genproto/googleapis/type/money"
+	"buf.build/gen/go/antinvestor/common/protocolbuffers/go/common/v1"
 )
 
 func TestMoneyRoundTrip(t *testing.T) {
@@ -41,9 +41,9 @@ func TestFromMoneyNil(t *testing.T) {
 }
 
 func TestCompareMoney(t *testing.T) {
-	a := &money.Money{CurrencyCode: "USD", Units: 10, Nanos: 500000000}
-	b := &money.Money{CurrencyCode: "USD", Units: 10, Nanos: 600000000}
-	c := &money.Money{CurrencyCode: "USD", Units: 10, Nanos: 500000000}
+	a := &commonv1.Money{CurrencyCode: "USD", Units: 10, Nanos: 500000000}
+	b := &commonv1.Money{CurrencyCode: "USD", Units: 10, Nanos: 600000000}
+	c := &commonv1.Money{CurrencyCode: "USD", Units: 10, Nanos: 500000000}
 
 	if CompareMoney(a, b) != -1 {
 		t.Error("expected a < b")
@@ -59,14 +59,14 @@ func TestCompareMoney(t *testing.T) {
 func TestToFloat64(t *testing.T) {
 	tests := []struct {
 		name string
-		m    *money.Money
+		m    *commonv1.Money
 		want float64
 	}{
 		{"nil", nil, 0},
-		{"whole", &money.Money{Units: 100}, 100.0},
-		{"fractional", &money.Money{Units: 42, Nanos: 500000000}, 42.5},
-		{"negative", &money.Money{Units: -10, Nanos: -250000000}, -10.25},
-		{"cents", &money.Money{Units: 0, Nanos: 10000000}, 0.01},
+		{"whole", &commonv1.Money{Units: 100}, 100.0},
+		{"fractional", &commonv1.Money{Units: 42, Nanos: 500000000}, 42.5},
+		{"negative", &commonv1.Money{Units: -10, Nanos: -250000000}, -10.25},
+		{"cents", &commonv1.Money{Units: 0, Nanos: 10000000}, 0.01},
 	}
 
 	for _, tt := range tests {
@@ -135,7 +135,7 @@ func TestToCents(t *testing.T) {
 
 func TestSmallestUnitRoundTrip_Cents(t *testing.T) {
 	// 10.50 USD -> 1050 cents -> back to 10.50 USD
-	m := &money.Money{CurrencyCode: "USD", Units: 10, Nanos: 500000000}
+	m := &commonv1.Money{CurrencyCode: "USD", Units: 10, Nanos: 500000000}
 	cents := ToSmallestUnit(m, 2)
 	if cents != 1050 {
 		t.Errorf("ToSmallestUnit(10.50 USD, 2) = %d, want 1050", cents)
@@ -148,7 +148,7 @@ func TestSmallestUnitRoundTrip_Cents(t *testing.T) {
 
 func TestSmallestUnitRoundTrip_Satoshi(t *testing.T) {
 	// 1.5 BTC -> 150000000 satoshi -> back
-	m := &money.Money{CurrencyCode: "BTC", Units: 1, Nanos: 500000000}
+	m := &commonv1.Money{CurrencyCode: "BTC", Units: 1, Nanos: 500000000}
 	sats := ToSmallestUnit(m, 8)
 	if sats != 150000000 {
 		t.Errorf("ToSmallestUnit(1.5 BTC, 8) = %d, want 150000000", sats)
@@ -161,7 +161,7 @@ func TestSmallestUnitRoundTrip_Satoshi(t *testing.T) {
 
 func TestSmallestUnitDecimal_Wei(t *testing.T) {
 	// 1.5 ETH in wei = 1500000000000000000
-	m := &money.Money{CurrencyCode: "ETH", Units: 1, Nanos: 500000000}
+	m := &commonv1.Money{CurrencyCode: "ETH", Units: 1, Nanos: 500000000}
 	wei := ToSmallestUnitDecimal(m, 18)
 	want, _ := decimalx.NewFromString("1500000000000000000")
 	if !wei.Equal(want) {
@@ -183,7 +183,7 @@ func TestFromInt64_Alias(t *testing.T) {
 }
 
 func TestToInt64_Alias(t *testing.T) {
-	m := &money.Money{CurrencyCode: "KES", Units: 150, Nanos: 500000000}
+	m := &commonv1.Money{CurrencyCode: "KES", Units: 150, Nanos: 500000000}
 	got := ToInt64(m, 2)
 	if got != 15050 {
 		t.Errorf("ToInt64(150.50 KES, 2) = %d, want 15050", got)
