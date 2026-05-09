@@ -3,8 +3,8 @@ package moneyx
 import (
 	"testing"
 
+	commonv1 "buf.build/gen/go/antinvestor/common/protocolbuffers/go/common/v1"
 	"github.com/pitabwire/util/decimalx"
-	"buf.build/gen/go/antinvestor/common/protocolbuffers/go/common/v1"
 )
 
 func TestMoneyRoundTrip(t *testing.T) {
@@ -27,7 +27,13 @@ func TestMoneyRoundTrip(t *testing.T) {
 			m := ToMoney("KES", orig)
 			back := FromMoney(m)
 			if !orig.Equal(back) {
-				t.Errorf("round-trip failed: %s -> Money{%d, %d} -> %s", orig, m.GetUnits(), m.GetNanos(), back)
+				t.Errorf(
+					"round-trip failed: %s -> Money{%d, %d} -> %s",
+					orig,
+					m.GetUnits(),
+					m.GetNanos(),
+					back,
+				)
 			}
 		})
 	}
@@ -96,11 +102,11 @@ func TestFromFloat64(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := FromFloat64("USD", tt.amount)
-			if got.Units != tt.wantUnit {
-				t.Errorf("Units = %d, want %d", got.Units, tt.wantUnit)
+			if got.GetUnits() != tt.wantUnit {
+				t.Errorf("Units = %d, want %d", got.GetUnits(), tt.wantUnit)
 			}
-			if got.Nanos != tt.wantNano {
-				t.Errorf("Nanos = %d, want %d", got.Nanos, tt.wantNano)
+			if got.GetNanos() != tt.wantNano {
+				t.Errorf("Nanos = %d, want %d", got.GetNanos(), tt.wantNano)
 			}
 		})
 	}
@@ -142,7 +148,11 @@ func TestSmallestUnitRoundTrip_Cents(t *testing.T) {
 	}
 	back := FromSmallestUnit("USD", cents, 2)
 	if back.Units != 10 || back.Nanos != 500000000 {
-		t.Errorf("FromSmallestUnit(1050, 2) = {%d, %d}, want {10, 500000000}", back.Units, back.Nanos)
+		t.Errorf(
+			"FromSmallestUnit(1050, 2) = {%d, %d}, want {10, 500000000}",
+			back.Units,
+			back.Nanos,
+		)
 	}
 }
 
@@ -155,7 +165,11 @@ func TestSmallestUnitRoundTrip_Satoshi(t *testing.T) {
 	}
 	back := FromSmallestUnit("BTC", sats, 8)
 	if back.Units != 1 || back.Nanos != 500000000 {
-		t.Errorf("FromSmallestUnit(150000000, 8) = {%d, %d}, want {1, 500000000}", back.Units, back.Nanos)
+		t.Errorf(
+			"FromSmallestUnit(150000000, 8) = {%d, %d}, want {1, 500000000}",
+			back.Units,
+			back.Nanos,
+		)
 	}
 }
 
@@ -171,7 +185,11 @@ func TestSmallestUnitDecimal_Wei(t *testing.T) {
 	// Round-trip back
 	back := FromSmallestUnitDecimal("ETH", wei, 18)
 	if back.Units != 1 || back.Nanos != 500000000 {
-		t.Errorf("FromSmallestUnitDecimal round-trip: {%d, %d}, want {1, 500000000}", back.Units, back.Nanos)
+		t.Errorf(
+			"FromSmallestUnitDecimal round-trip: {%d, %d}, want {1, 500000000}",
+			back.Units,
+			back.Nanos,
+		)
 	}
 }
 

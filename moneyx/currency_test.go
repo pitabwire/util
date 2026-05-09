@@ -81,8 +81,14 @@ func TestToSmallestUnitStrict_SignMismatch(t *testing.T) {
 		name string
 		m    *commonv1.Money
 	}{
-		{"positive units, negative nanos", &commonv1.Money{CurrencyCode: "USD", Units: 1, Nanos: -100}},
-		{"negative units, positive nanos", &commonv1.Money{CurrencyCode: "USD", Units: -1, Nanos: 100}},
+		{
+			"positive units, negative nanos",
+			&commonv1.Money{CurrencyCode: "USD", Units: 1, Nanos: -100},
+		},
+		{
+			"negative units, positive nanos",
+			&commonv1.Money{CurrencyCode: "USD", Units: -1, Nanos: 100},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -102,9 +108,27 @@ func TestToMinorUnitsByCurrency(t *testing.T) {
 		want             int64
 		wantErr          bool
 	}{
-		{"USD 12.34", &commonv1.Money{CurrencyCode: "USD", Units: 12, Nanos: 340_000_000}, "USD", 1234, false},
-		{"JPY 500 (zero decimals)", &commonv1.Money{CurrencyCode: "JPY", Units: 500, Nanos: 0}, "JPY", 500, false},
-		{"KWD 1.234 (three decimals)", &commonv1.Money{CurrencyCode: "KWD", Units: 1, Nanos: 234_000_000}, "KWD", 1234, false},
+		{
+			"USD 12.34",
+			&commonv1.Money{CurrencyCode: "USD", Units: 12, Nanos: 340_000_000},
+			"USD",
+			1234,
+			false,
+		},
+		{
+			"JPY 500 (zero decimals)",
+			&commonv1.Money{CurrencyCode: "JPY", Units: 500, Nanos: 0},
+			"JPY",
+			500,
+			false,
+		},
+		{
+			"KWD 1.234 (three decimals)",
+			&commonv1.Money{CurrencyCode: "KWD", Units: 1, Nanos: 234_000_000},
+			"KWD",
+			1234,
+			false,
+		},
 		{"USD vs KES mismatch", &commonv1.Money{CurrencyCode: "USD", Units: 1}, "KES", 0, true},
 		{"nil money", nil, "USD", 0, true},
 	}
@@ -166,7 +190,13 @@ func TestRoundTripByCurrency(t *testing.T) {
 					t.Fatalf("unexpected error: %v", err)
 				}
 				if back != minor {
-					t.Errorf("round-trip: in=%d, out=%d (Money{%d,%d})", minor, back, m.GetUnits(), m.GetNanos())
+					t.Errorf(
+						"round-trip: in=%d, out=%d (Money{%d,%d})",
+						minor,
+						back,
+						m.GetUnits(),
+						m.GetNanos(),
+					)
 				}
 			})
 		}

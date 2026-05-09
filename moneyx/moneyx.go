@@ -142,7 +142,11 @@ func ToSmallestUnitDecimal(m *commonv1.Money, decimals int32) decimalx.Decimal {
 // FromSmallestUnitDecimal converts a Decimal in the smallest unit back to
 // a common.v1.Money. Use this when the smallest-unit value may exceed
 // int64 range.
-func FromSmallestUnitDecimal(currency string, amount decimalx.Decimal, decimals int32) *commonv1.Money {
+func FromSmallestUnitDecimal(
+	currency string,
+	amount decimalx.Decimal,
+	decimals int32,
+) *commonv1.Money {
 	divisor := decimalx.New(1, decimals)
 	d := amount.Div(divisor)
 	return ToMoney(currency, d)

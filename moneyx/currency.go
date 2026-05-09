@@ -63,7 +63,11 @@ var ErrNilMoney = errors.New("money: nil input")
 // validating that the currency matches expectedCurrency (case-insensitive)
 // and that the units/nanos signs agree. It is the strict variant of
 // ToSmallestUnit for callers that need to refuse silent coercion.
-func ToSmallestUnitStrict(m *commonv1.Money, expectedCurrency string, decimals int32) (int64, error) {
+func ToSmallestUnitStrict(
+	m *commonv1.Money,
+	expectedCurrency string,
+	decimals int32,
+) (int64, error) {
 	if m == nil {
 		return 0, ErrNilMoney
 	}
