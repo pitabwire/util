@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported helpers
 package decimalx
 
 import (
@@ -241,8 +242,8 @@ func TestJSONRoundTrip(t *testing.T) {
 	}
 
 	var got Decimal
-	if err := json.Unmarshal(data, &got); err != nil {
-		t.Fatal(err)
+	if uerr := json.Unmarshal(data, &got); uerr != nil {
+		t.Fatal(uerr)
 	}
 	if !got.Equal(orig) {
 		t.Errorf("unmarshal round-trip: got %s, want %s", got, orig)

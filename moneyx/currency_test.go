@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported helpers
 package moneyx
 
 import (

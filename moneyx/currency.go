@@ -1,4 +1,4 @@
-// Package money — ISO 4217 currency precision lookup and strict
+// Package moneyx — ISO 4217 currency precision lookup and strict
 // conversion helpers. The conversions in moneyx.go take an explicit
 // `decimals` parameter; in many callers the decimals are determined
 // solely by the currency code, and a strict check that the wire money
@@ -13,10 +13,24 @@ import (
 	commonv1 "buf.build/gen/go/antinvestor/common/protocolbuffers/go/common/v1"
 )
 
+// Default ISO 4217 fractional digit counts.
+const (
+	// DecimalsZero is used by codes like JPY, KRW, UGX where the major and
+	// minor unit are identical.
+	DecimalsZero int32 = 0
+	// DecimalsTwo is the default precision and covers the majority of ISO
+	// 4217 codes.
+	DecimalsTwo int32 = 2
+	// DecimalsThree is used by Gulf and Tunisian codes (BHD, IQD, etc.).
+	DecimalsThree int32 = 3
+)
+
 // ─── ISO 4217 precision lookup ──────────────────────────────────────
 
 // zeroDecimal is the set of ISO 4217 codes whose minor unit equals the
 // major unit (no fractional digits).
+//
+//nolint:gochecknoglobals // ISO 4217 lookup table — effectively const.
 var zeroDecimal = map[string]struct{}{
 	"BIF": {}, "CLP": {}, "DJF": {}, "GNF": {}, "ISK": {}, "JPY": {},
 	"KMF": {}, "KRW": {}, "PYG": {}, "RWF": {}, "UGX": {}, "UYI": {},
@@ -24,6 +38,8 @@ var zeroDecimal = map[string]struct{}{
 }
 
 // threeDecimal is the set of ISO 4217 codes with three fractional digits.
+//
+//nolint:gochecknoglobals // ISO 4217 lookup table — effectively const.
 var threeDecimal = map[string]struct{}{
 	"BHD": {}, "IQD": {}, "JOD": {}, "KWD": {}, "LYD": {}, "OMR": {}, "TND": {},
 }
@@ -35,12 +51,12 @@ var threeDecimal = map[string]struct{}{
 func Decimals(currencyCode string) int32 {
 	c := strings.ToUpper(strings.TrimSpace(currencyCode))
 	if _, ok := zeroDecimal[c]; ok {
-		return 0
+		return DecimalsZero
 	}
 	if _, ok := threeDecimal[c]; ok {
-		return 3
+		return DecimalsThree
 	}
-	return 2
+	return DecimalsTwo
 }
 
 // ─── Strict converters ──────────────────────────────────────────────

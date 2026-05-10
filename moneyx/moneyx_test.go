@@ -1,3 +1,4 @@
+//nolint:testpackage // tests exercise unexported helpers
 package moneyx
 
 import (
@@ -147,11 +148,11 @@ func TestSmallestUnitRoundTrip_Cents(t *testing.T) {
 		t.Errorf("ToSmallestUnit(10.50 USD, 2) = %d, want 1050", cents)
 	}
 	back := FromSmallestUnit("USD", cents, 2)
-	if back.Units != 10 || back.Nanos != 500000000 {
+	if back.GetUnits() != 10 || back.GetNanos() != 500000000 {
 		t.Errorf(
 			"FromSmallestUnit(1050, 2) = {%d, %d}, want {10, 500000000}",
-			back.Units,
-			back.Nanos,
+			back.GetUnits(),
+			back.GetNanos(),
 		)
 	}
 }
@@ -164,11 +165,11 @@ func TestSmallestUnitRoundTrip_Satoshi(t *testing.T) {
 		t.Errorf("ToSmallestUnit(1.5 BTC, 8) = %d, want 150000000", sats)
 	}
 	back := FromSmallestUnit("BTC", sats, 8)
-	if back.Units != 1 || back.Nanos != 500000000 {
+	if back.GetUnits() != 1 || back.GetNanos() != 500000000 {
 		t.Errorf(
 			"FromSmallestUnit(150000000, 8) = {%d, %d}, want {1, 500000000}",
-			back.Units,
-			back.Nanos,
+			back.GetUnits(),
+			back.GetNanos(),
 		)
 	}
 }
@@ -184,19 +185,19 @@ func TestSmallestUnitDecimal_Wei(t *testing.T) {
 
 	// Round-trip back
 	back := FromSmallestUnitDecimal("ETH", wei, 18)
-	if back.Units != 1 || back.Nanos != 500000000 {
+	if back.GetUnits() != 1 || back.GetNanos() != 500000000 {
 		t.Errorf(
 			"FromSmallestUnitDecimal round-trip: {%d, %d}, want {1, 500000000}",
-			back.Units,
-			back.Nanos,
+			back.GetUnits(),
+			back.GetNanos(),
 		)
 	}
 }
 
 func TestFromInt64_Alias(t *testing.T) {
 	m := FromInt64("KES", 15050, 2)
-	if m.Units != 150 || m.Nanos != 500000000 {
-		t.Errorf("FromInt64(KES, 15050, 2) = {%d, %d}, want {150, 500000000}", m.Units, m.Nanos)
+	if m.GetUnits() != 150 || m.GetNanos() != 500000000 {
+		t.Errorf("FromInt64(KES, 15050, 2) = {%d, %d}, want {150, 500000000}", m.GetUnits(), m.GetNanos())
 	}
 }
 
