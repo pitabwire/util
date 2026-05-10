@@ -18,18 +18,31 @@ const (
 	NanoSize = 1_000_000_000
 	// MaxNanosValue is the maximum value for nanos (10^9 - 1).
 	MaxNanosValue = 999999999
+	// ctxPrecision is the precision (in significant digits) used by the
+	// shared apd context.
+	ctxPrecision = 38
+	// ctxMaxExponent / ctxMinExponent bound the shared context.
+	ctxMaxExponent = 5000
+	ctxMinExponent = -5000
+	// basisPointsPerOne is the divisor used to translate basis points
+	// (1/100 of a percent) into a decimal fraction.
+	basisPointsPerOne = 10000
 )
 
 // ctx is the shared arithmetic context: 38 digits, half-up rounding.
+//
+//nolint:gochecknoglobals // single shared apd.Context is intentional.
 var ctx = &apd.Context{
-	Precision:   38,
+	Precision:   ctxPrecision,
 	Rounding:    apd.RoundHalfUp,
-	MaxExponent: 5000,
-	MinExponent: -5000,
+	MaxExponent: ctxMaxExponent,
+	MinExponent: ctxMinExponent,
 	Traps:       apd.DefaultTraps,
 }
 
 // Decimal wraps *apd.Decimal for precise decimal calculations.
+//
+//nolint:recvcheck // Scan/UnmarshalJSON intentionally use pointer receivers.
 type Decimal struct {
 	d *apd.Decimal
 }
@@ -84,7 +97,7 @@ func Zero() Decimal {
 // For example, 1500 bp becomes 0.15.
 func NewFromBasisPoints(bp int64) Decimal {
 	result := new(apd.Decimal)
-	_, _ = ctx.Quo(result, apd.New(bp, 0), apd.New(10000, 0))
+	_, _ = ctx.Quo(result, apd.New(bp, 0), apd.New(basisPointsPerOne, 0))
 	return Decimal{d: result}
 }
 
@@ -265,7 +278,7 @@ func (v Decimal) Int64() int64 {
 // ApplyBasisPoints computes amount * bp / 10000.
 func ApplyBasisPoints(amount Decimal, bp int64) Decimal {
 	bpDec := apd.New(bp, 0)
-	divisor := apd.New(10000, 0)
+	divisor := apd.New(basisPointsPerOne, 0)
 
 	tmp := new(apd.Decimal)
 	_, _ = ctx.Mul(tmp, amount.inner(), bpDec)
