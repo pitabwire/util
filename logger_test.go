@@ -135,6 +135,7 @@ func TestMultiHandlerVerification(t *testing.T) {
 	t.Run("HandlerExclusiveMode", testHandlerExclusiveMode)
 	t.Run("DefaultMultiHandlerBehavior", testDefaultMultiHandlerBehavior)
 	t.Run("MultipleHandlersViaMultipleLoggers", testMultipleHandlersViaMultipleLoggers)
+	t.Run("ChildLevelRespectedInFanOut", testChildLevelRespectedInFanOut)
 	t.Run("JSONFormatOutput", testJSONFormatOutput)
 	t.Run("HandlerWrapper", testHandlerWrapper)
 }
@@ -274,6 +275,40 @@ func testHandlerWrapper(t *testing.T) {
 	output := buf.String()
 	if !strings.Contains(output, `"injected":"trace123"`) {
 		t.Errorf("Handler wrapper did not inject attribute, got: %s", output)
+	}
+}
+
+// A permissive child handler (e.g. an OTel exporter that accepts every
+// level) must not cause records to reach children whose own level filters
+// them out. Regression: Handle fanned out without re-checking each child's
+// Enabled, so LOG_LEVEL=info still printed DEBUG lines to stdout whenever
+// a telemetry handler was attached.
+func testChildLevelRespectedInFanOut(t *testing.T) {
+	ctx := t.Context()
+	var infoBuf, permissiveBuf bytes.Buffer
+	permissiveHandler := slog.NewJSONHandler(&permissiveBuf, &slog.HandlerOptions{Level: slog.LevelDebug})
+
+	// The standard handler is built at the configured level (info, capturing
+	// to infoBuf); the extra handler is permissive (debug). This mirrors
+	// frame attaching an OTel exporter handler next to the stdout handler.
+	logger := util.NewLogger(ctx,
+		util.WithLogLevel(slog.LevelInfo),
+		util.WithLogFormat("json"),
+		util.WithLogOutput(&infoBuf),
+		util.WithLogHandler(permissiveHandler))
+	defer logger.Release()
+
+	logger.Debug("debug message")
+	logger.Info("info message")
+
+	if strings.Contains(infoBuf.String(), "debug message") {
+		t.Errorf("info-level handler received a debug record via fan-out: %s", infoBuf.String())
+	}
+	if !strings.Contains(permissiveBuf.String(), "debug message") {
+		t.Error("debug-level handler should still receive debug records")
+	}
+	if !strings.Contains(infoBuf.String(), "info message") {
+		t.Error("info-level handler should receive info records")
 	}
 }
 
