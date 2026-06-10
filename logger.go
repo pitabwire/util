@@ -258,7 +258,14 @@ func (m *MultiHandler) Enabled(ctx context.Context, level slog.Level) bool {
 
 func (m *MultiHandler) Handle(ctx context.Context, r slog.Record) error {
 	for _, h := range m.handlers {
-		if err := h.Handle(ctx, r); err != nil {
+		// Enabled is re-checked per child: MultiHandler.Enabled reports true
+		// if ANY child accepts the level, so a permissive child (e.g. an
+		// OTel exporter handler) must not force records onto children whose
+		// level filters them out.
+		if !h.Enabled(ctx, r.Level) {
+			continue
+		}
+		if err := h.Handle(ctx, r.Clone()); err != nil {
 			return err
 		}
 	}
