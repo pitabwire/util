@@ -75,20 +75,7 @@ func defaultHandlerCreator(writer io.Writer, opts *logOptions) slog.Handler {
 		}
 	}
 
-	var stdHandler slog.Handler
-	if opts.format == "json" {
-		stdHandler = slog.NewJSONHandler(writer, &slog.HandlerOptions{
-			AddSource: opts.addSource,
-			Level:     opts.level,
-		})
-	} else {
-		stdHandler = tint.NewHandler(writer, &tint.Options{
-			AddSource:  opts.addSource,
-			Level:      opts.level,
-			TimeFormat: opts.timeFormat,
-			NoColor:    opts.noColor,
-		})
-	}
+	stdHandler := newBaseHandler(writer, opts)
 
 	if opts.handlerWrapper != nil {
 		stdHandler = opts.handlerWrapper(stdHandler)
@@ -101,6 +88,21 @@ func defaultHandlerCreator(writer io.Writer, opts *logOptions) slog.Handler {
 	}
 
 	return multiHandler
+}
+
+func newBaseHandler(writer io.Writer, opts *logOptions) slog.Handler {
+	if opts.format == "json" {
+		return slog.NewJSONHandler(writer, &slog.HandlerOptions{
+			AddSource: opts.addSource,
+			Level:     opts.level,
+		})
+	}
+	return tint.NewHandler(writer, &tint.Options{
+		AddSource:  opts.addSource,
+		Level:      opts.level,
+		TimeFormat: opts.timeFormat,
+		NoColor:    opts.noColor,
+	})
 }
 
 // WithLogLevel sets the log level.
